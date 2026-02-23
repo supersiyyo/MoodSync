@@ -19,7 +19,7 @@ const DARK_BG = '#050B18';
 
 export default function HostScreen() {
     const [hostName, setHostName] = useState('');
-    const [rnValue, setRnValue] = useState('');
+    const [roomName, setRoomName] = useState('');
     const [isExplicit, setIsExplicit] = useState(true);
 
     const ambientScale = useSharedValue(1);
@@ -91,9 +91,9 @@ export default function HostScreen() {
                                 </View>
                             </View>
 
-                            {/* RN Input */}
+                            {/* Room Name Input */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>RN</Text>
+                                <Text style={styles.label}>Room Name</Text>
                                 <View style={styles.inputWrapper}>
                                     <LinearGradient
                                         colors={[CYAN, PURPLE]}
@@ -105,8 +105,8 @@ export default function HostScreen() {
                                             style={styles.input}
                                             placeholder="e.g. XCQP"
                                             placeholderTextColor="rgba(255,255,255,0.4)"
-                                            value={rnValue}
-                                            onChangeText={(text) => setRnValue(text.toUpperCase())}
+                                            value={roomName}
+                                            onChangeText={(text) => setRoomName(text.toUpperCase())}
                                             autoCapitalize="characters"
                                             maxLength={8}
                                             selectionColor={CYAN}
