@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Link } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -10,7 +11,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, Path, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,23 +52,33 @@ const FloatingEmoji = ({ emoji, initialX, initialY, delay }: { emoji: string; in
 };
 
 export default function MoodSyncLandingPage() {
-  const pulseScale = useSharedValue(1);
+  const ambientScale = useSharedValue(1);
+  const ambientOpacity = useSharedValue(0.3);
 
   useEffect(() => {
-    // Subtle scale(1.05) pulse synchronized with soundwave feel
-    pulseScale.value = withRepeat(
+    // Soft ambient breathing effect
+    ambientScale.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+        withTiming(1.3, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
       true
     );
-  }, [pulseScale]);
+    ambientOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, [ambientScale, ambientOpacity]);
 
-  const animatedCenterFace = useAnimatedStyle(() => {
+  const animatedAmbient = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: pulseScale.value }],
+      transform: [{ scale: ambientScale.value }],
+      opacity: ambientOpacity.value,
     };
   });
 
@@ -88,7 +99,13 @@ export default function MoodSyncLandingPage() {
         </View>
 
         <SafeAreaView style={styles.safeArea}>
-          {/* Layer 2: Header Section */}
+          {/* Ambient Background Glows */}
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <Animated.View style={[styles.ambientGlow, { top: height * 0.2, left: width * 0.1, backgroundColor: CYAN }, animatedAmbient]} />
+            <Animated.View style={[styles.ambientGlow, { top: height * 0.5, left: width * 0.5, backgroundColor: PURPLE }, animatedAmbient]} />
+          </View>
+
+          {/* Layer 2: Centered Header Section */}
           <View style={styles.headerContainer}>
             <View style={styles.moodTextWrapper}>
               {/* Emojis directly above the 'oo' */}
@@ -98,68 +115,9 @@ export default function MoodSyncLandingPage() {
               </View>
               <Text style={styles.headerText}>Mood</Text>
             </View>
-            <Text style={styles.headerText}>Sync</Text>
-          </View>
-
-          {/* Layer 3: Visualizer (Center) */}
-          <View style={styles.visualizerContainer}>
-            {/* Bottom layer: Horizontal SVG frequency wave */}
-            <View style={styles.waveLayer}>
-              <Svg width={width} height={150} viewBox={`0 0 ${width} 150`}>
-                <Defs>
-                  <SvgLinearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor={CYAN} stopOpacity="1" />
-                    <Stop offset="50%" stopColor={PURPLE} stopOpacity="1" />
-                    <Stop offset="100%" stopColor={CYAN} stopOpacity="1" />
-                  </SvgLinearGradient>
-                </Defs>
-
-                {/* Simulated jagged audio wave paths */}
-                <Path
-                  d={`M0 75 Q ${width * 0.05} 65, ${width * 0.1} 75 T ${width * 0.2} 40 T ${width * 0.3} 90 T ${width * 0.4} 30 T ${width * 0.5} 120 T ${width * 0.6} 20 T ${width * 0.7} 95 T ${width * 0.8} 50 T ${width * 0.9} 85 T ${width} 75`}
-                  fill="none"
-                  stroke="url(#waveGrad)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={0.8}
-                />
-                <Path
-                  d={`M0 75 Q ${width * 0.05} 85, ${width * 0.1} 75 T ${width * 0.2} 110 T ${width * 0.3} 60 T ${width * 0.4} 120 T ${width * 0.5} 30 T ${width * 0.6} 130 T ${width * 0.7} 55 T ${width * 0.8} 100 T ${width * 0.9} 65 T ${width} 75`}
-                  fill="none"
-                  stroke="url(#waveGrad)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={0.8}
-                />
-
-                {/* Dense inner frequency waves */}
-                <Path
-                  d={`M0 75 Q ${width * 0.15} 65, ${width * 0.25} 80 T ${width * 0.45} 50 T ${width * 0.5} 90 T ${width * 0.55} 40 T ${width * 0.75} 85 T ${width} 75`}
-                  fill="none"
-                  stroke="url(#waveGrad)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={0.5}
-                />
-                <Path
-                  d={`M0 75 Q ${width * 0.15} 85, ${width * 0.25} 70 T ${width * 0.45} 100 T ${width * 0.5} 60 T ${width * 0.55} 110 T ${width * 0.75} 65 T ${width} 75`}
-                  fill="none"
-                  stroke="url(#waveGrad)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={0.5}
-                />
-              </Svg>
-            </View>
-
-            {/* Top layer: High-definition smiling face emoji with pulse animation */}
-            <Animated.View style={[styles.centerEmojiWrapper, animatedCenterFace]}>
-              <Text style={styles.centerEmoji}>😊</Text>
-            </Animated.View>
+            <Link href="/explore" asChild>
+              <Text style={styles.headerTextLink}>Sync</Text>
+            </Link>
           </View>
 
           {/* Layer 4: Spotify Button Component */}
@@ -230,8 +188,22 @@ const styles = StyleSheet.create({
     textShadowRadius: 15,
   },
   headerContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 40,
+    justifyContent: 'center',
+  },
+  ambientGlow: {
+    position: 'absolute',
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    filter: 'blur(50px)', // Uses web blur or works broadly on newer RN
+    // Fallback shadow for ambient glow if blur is unsupported natively
+    shadowColor: CYAN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 50,
+    elevation: 20,
   },
   moodTextWrapper: {
     alignItems: 'center',
@@ -264,38 +236,17 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
-  visualizerContainer: {
-    height: 250,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  waveLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  centerEmojiWrapper: {
-    zIndex: 2,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: CYAN,
-    backgroundColor: DARK_BG,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Center glow effect
-    shadowColor: CYAN,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  centerEmoji: {
-    fontSize: 50, // High-definition emoji sizing
+
+  headerTextLink: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#E0F8FF',
+    letterSpacing: 2,
+    lineHeight: 74,
+    textAlign: 'center',
+    textShadowColor: PURPLE,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
   },
   footerContainer: {
     alignItems: 'center',
