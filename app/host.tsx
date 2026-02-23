@@ -103,7 +103,7 @@ export default function HostScreen() {
                                     >
                                         <TextInput
                                             style={styles.input}
-                                            placeholder="e.g. XCQP"
+                                            placeholder="e.g. VIBECAVE"
                                             placeholderTextColor="rgba(255,255,255,0.4)"
                                             value={roomName}
                                             onChangeText={(text) => setRoomName(text.toUpperCase())}
