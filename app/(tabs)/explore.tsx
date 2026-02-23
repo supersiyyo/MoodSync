@@ -1,112 +1,167 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Link } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+const { width, height } = Dimensions.get('window');
 
-export default function TabTwoScreen() {
+// Color Palette
+const CYAN = '#00F2FF';
+const PURPLE = '#BC00FF';
+const DARK_BG = '#050B18';
+
+export default function ExploreScreen() {
+  const ambientScale = useSharedValue(1);
+  const ambientOpacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    // Soft ambient breathing effect
+    ambientScale.value = withRepeat(
+      withSequence(
+        withTiming(1.3, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    ambientOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, [ambientScale, ambientOpacity]);
+
+  const animatedAmbient = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: ambientScale.value }],
+      opacity: ambientOpacity.value,
+    };
+  });
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      {/* Ambient Background Glows */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Animated.View style={[styles.ambientGlow, { top: height * 0.1, left: -width * 0.2, backgroundColor: CYAN }, animatedAmbient]} />
+        <Animated.View style={[styles.ambientGlow, { bottom: height * 0.1, right: -width * 0.2, backgroundColor: PURPLE }, animatedAmbient]} />
+      </View>
+
+      <View style={styles.contentContainer}>
+        <Text style={styles.titleText}>Choose Path</Text>
+
+        <View style={styles.buttonContainer}>
+          {/* Host Button */}
+          <Link href="/host" asChild>
+            <TouchableOpacity activeOpacity={0.8} style={styles.touchableArea}>
+              <LinearGradient
+                colors={[CYAN, '#0088FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.gradientBorder, { shadowColor: CYAN }]}
+              >
+                <View style={styles.innerButton}>
+                  <Text style={[styles.buttonText, { textShadowColor: CYAN }]}>Host</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Link>
+
+          {/* Join Button */}
+          <TouchableOpacity activeOpacity={0.8} style={styles.touchableArea}>
+            <LinearGradient
+              colors={[PURPLE, '#FF00A0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.gradientBorder, { shadowColor: PURPLE }]}
+            >
+              <View style={styles.innerButton}>
+                <Text style={[styles.buttonText, { textShadowColor: PURPLE }]}>Join</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: DARK_BG,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  ambientGlow: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    filter: 'blur(60px)',
+    // Fallback shadow for ambient glow
+    shadowColor: CYAN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 60,
+    elevation: 20,
+  },
+  contentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  titleText: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#E0F8FF',
+    letterSpacing: 2,
+    marginBottom: 60,
+    textAlign: 'center',
+    textShadowColor: CYAN,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
+  },
+  buttonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 30, // Space between buttons
+  },
+  touchableArea: {
+    width: '80%',
+  },
+  gradientBorder: {
+    borderRadius: 25,
+    padding: 3, // Border thickness
+    // Drop shadow
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 15,
+  },
+  innerButton: {
+    backgroundColor: DARK_BG,
+    borderRadius: 22,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
   },
 });
