@@ -20,8 +20,12 @@ const CYAN = '#00F2FF';
 const PURPLE = '#BC00FF';
 const DARK_BG = '#050B18';
 
+const EMOJIS = ['😊', '😂', '🥰', '😎', '🤩', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐', '😯', '😪', '😫', '🥱', '😴', '😌', '😛', '😜', '😝', '🤤', '😒', '😓', '😔', '😕', '💖', '⚡', '⭐', '🎵', '🔥', '✨', '🎈', '🎉'];
+const getRandomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+
 // Reusable animated floating emoji component
-const FloatingEmoji = ({ emoji, initialX, initialY, delay }: { emoji: string; initialX: number; initialY: number; delay: number }) => {
+const FloatingEmoji = ({ initialX, initialY, delay }: { initialX: number; initialY: number; delay: number }) => {
+  const [emoji] = React.useState(getRandomEmoji);
   const translateY = useSharedValue(0);
 
   useEffect(() => {
@@ -82,20 +86,25 @@ export default function MoodSyncLandingPage() {
     };
   });
 
+  const RandomDecorEmoji = ({ style }: { style: any }) => {
+    const [emoji] = React.useState(getRandomEmoji);
+    return <Text style={style}>{emoji}</Text>;
+  };
+
   return (
     <View style={styles.container}>
       {/* Outer Viewport Glow Simulation */}
       <View style={styles.viewportGlow}>
         {/* Layer 1: Floating Assets Layer */}
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-          <FloatingEmoji emoji="💖" initialX={30} initialY={120} delay={0} />
-          <FloatingEmoji emoji="⚡" initialX={width - 70} initialY={150} delay={500} />
-          <FloatingEmoji emoji="⭐" initialX={width - 90} initialY={height * 0.6} delay={1000} />
-          <FloatingEmoji emoji="🎵" initialX={40} initialY={300} delay={200} />
-          <FloatingEmoji emoji="🎵" initialX={width - 60} initialY={350} delay={800} />
-          <FloatingEmoji emoji="💖" initialX={70} initialY={height * 0.75} delay={600} />
-          <FloatingEmoji emoji="😞" initialX={width - 80} initialY={height * 0.85} delay={1200} />
-          <FloatingEmoji emoji="😊" initialX={30} initialY={height * 0.9} delay={300} />
+          <FloatingEmoji initialX={30} initialY={120} delay={0} />
+          <FloatingEmoji initialX={width - 70} initialY={150} delay={500} />
+          <FloatingEmoji initialX={width - 90} initialY={height * 0.6} delay={1000} />
+          <FloatingEmoji initialX={40} initialY={300} delay={200} />
+          <FloatingEmoji initialX={width - 60} initialY={350} delay={800} />
+          <FloatingEmoji initialX={70} initialY={height * 0.75} delay={600} />
+          <FloatingEmoji initialX={width - 80} initialY={height * 0.85} delay={1200} />
+          <FloatingEmoji initialX={30} initialY={height * 0.9} delay={300} />
         </View>
 
         <SafeAreaView style={styles.safeArea}>
@@ -110,8 +119,8 @@ export default function MoodSyncLandingPage() {
             <View style={styles.moodTextWrapper}>
               {/* Emojis directly above the 'oo' */}
               <View style={styles.emojiOverlaysRow}>
-                <Text style={styles.emojiOverlayText}>😊</Text>
-                <Text style={styles.emojiOverlayText}>😊</Text>
+                <RandomDecorEmoji style={styles.emojiOverlayText} />
+                <RandomDecorEmoji style={styles.emojiOverlayText} />
               </View>
               <Text style={styles.headerText}>Mood</Text>
             </View>
@@ -131,12 +140,12 @@ export default function MoodSyncLandingPage() {
               <View style={styles.spotifyButtonInner}>
                 {/* Background emojis inside the button */}
                 <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-                  <Text style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]}>😊</Text>
-                  <Text style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]}>😞</Text>
-                  <Text style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]}>💖</Text>
-                  <Text style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]}>😞</Text>
-                  <Text style={[styles.tinyDecorEmoji, { left: 90, bottom: 8, fontSize: 10 }]}>😊</Text>
-                  <Text style={[styles.tinyDecorEmoji, { right: 90, bottom: 8, fontSize: 10 }]}>⭐</Text>
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]} />
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]} />
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]} />
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]} />
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 90, bottom: 8, fontSize: 10 }]} />
+                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 90, bottom: 8, fontSize: 10 }]} />
                 </View>
 
                 {/* Spotify Logo and Text */}
@@ -226,11 +235,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 10,
   },
   headerText: {
-    fontSize: 64,
+    fontSize: 84,
     fontWeight: '800',
     color: '#E0F8FF', // Soft glowing cyan-white
     letterSpacing: 2,
-    lineHeight: 74,
+    lineHeight: 94,
     textAlign: 'center',
     textShadowColor: CYAN,
     textShadowOffset: { width: 0, height: 0 },
@@ -238,11 +247,11 @@ const styles = StyleSheet.create({
   },
 
   headerTextLink: {
-    fontSize: 64,
+    fontSize: 84,
     fontWeight: '800',
     color: '#E0F8FF',
     letterSpacing: 2,
-    lineHeight: 74,
+    lineHeight: 94,
     textAlign: 'center',
     textShadowColor: PURPLE,
     textShadowOffset: { width: 0, height: 0 },
