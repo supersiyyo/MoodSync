@@ -78,18 +78,20 @@ export default function ExploreScreen() {
           </Link>
 
           {/* Join Button */}
-          <TouchableOpacity activeOpacity={0.8} style={styles.touchableArea}>
-            <LinearGradient
-              colors={[PURPLE, '#FF00A0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.gradientBorder, { shadowColor: PURPLE }]}
-            >
-              <View style={styles.innerButton}>
-                <Text style={[styles.buttonText, { textShadowColor: PURPLE }]}>Join</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          <Link href="/join" asChild>
+            <TouchableOpacity activeOpacity={0.8} style={styles.touchableArea}>
+              <LinearGradient
+                colors={[PURPLE, '#FF00A0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.gradientBorder, { shadowColor: PURPLE }]}
+              >
+                <View style={styles.innerButton}>
+                  <Text style={[styles.buttonText, { textShadowColor: PURPLE }]}>Join</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Link>
         </View>
       </View>
     </View>

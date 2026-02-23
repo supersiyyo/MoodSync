@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="explore" />
         <Stack.Screen name="host" />
+        <Stack.Screen name="join" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
