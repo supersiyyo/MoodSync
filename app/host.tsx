@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { doc, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -9,6 +11,7 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
+import { db } from '../services/firebase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,9 +21,11 @@ const PURPLE = '#BC00FF';
 const DARK_BG = '#050B18';
 
 export default function HostScreen() {
+    const router = useRouter();
     const [hostName, setHostName] = useState('');
     const [roomName, setRoomName] = useState('');
     const [isExplicit, setIsExplicit] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
     const ambientScale = useSharedValue(1);
     const ambientOpacity = useSharedValue(0.3);
@@ -51,6 +56,45 @@ export default function HostScreen() {
             opacity: ambientOpacity.value,
         };
     });
+
+    const generateRoomCode = () => {
+        // Generate a 4-character alphanumeric code (excluding confusing characters like O, 0, I, 1)
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let result = '';
+        for (let i = 0; i < 4; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    const handleStart = async () => {
+        if (!hostName.trim() || !roomName.trim()) {
+            Alert.alert('Missing Info', 'Please enter your name and a room name.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const code = generateRoomCode();
+
+            // Save session to Firestore
+            await setDoc(doc(db, 'sessions', code), {
+                hostName: hostName.trim(),
+                roomName: roomName.trim(),
+                isExplicit,
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            });
+
+            // Navigate to the room screen
+            router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}`);
+        } catch (error) {
+            console.error("Error creating session:", error);
+            Alert.alert('Error', 'Failed to create room. Please check your connection and try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -86,6 +130,7 @@ export default function HostScreen() {
                                             value={hostName}
                                             onChangeText={setHostName}
                                             selectionColor={CYAN}
+                                            editable={!isLoading}
                                         />
                                     </LinearGradient>
                                 </View>
@@ -108,8 +153,9 @@ export default function HostScreen() {
                                             value={roomName}
                                             onChangeText={(text) => setRoomName(text.toUpperCase())}
                                             autoCapitalize="characters"
-                                            maxLength={8}
+                                            maxLength={12}
                                             selectionColor={CYAN}
+                                            editable={!isLoading}
                                         />
                                     </LinearGradient>
                                 </View>
@@ -127,6 +173,7 @@ export default function HostScreen() {
                                         onValueChange={setIsExplicit}
                                         value={isExplicit}
                                         style={{ marginHorizontal: 10, transform: [{ scale: 1.2 }] }}
+                                        disabled={isLoading}
                                     />
                                     <Text style={[styles.switchText, isExplicit && styles.activeSwitchText]}>Yes</Text>
                                 </View>
@@ -134,15 +181,24 @@ export default function HostScreen() {
                         </View>
 
                         {/* Start Button */}
-                        <TouchableOpacity activeOpacity={0.8} style={styles.startButtonContainer}>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            style={styles.startButtonContainer}
+                            onPress={handleStart}
+                            disabled={isLoading}
+                        >
                             <LinearGradient
                                 colors={[CYAN, PURPLE]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
-                                style={[styles.gradientBorder, { shadowColor: CYAN }]}
+                                style={[styles.gradientBorder, { shadowColor: CYAN, opacity: isLoading ? 0.7 : 1 }]}
                             >
                                 <View style={styles.innerButton}>
-                                    <Text style={styles.buttonText}>START</Text>
+                                    {isLoading ? (
+                                        <ActivityIndicator color={CYAN} size="large" />
+                                    ) : (
+                                        <Text style={styles.buttonText}>START</Text>
+                                    )}
                                 </View>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -167,7 +223,7 @@ const styles = StyleSheet.create({
         width: 350,
         height: 350,
         borderRadius: 175,
-        filter: 'blur(70px)',
+        filter: 'blur(70px)', // Warning: React Native web only, use shadow for native
         shadowColor: CYAN,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.6,
@@ -283,3 +339,4 @@ const styles = StyleSheet.create({
         textShadowRadius: 15,
     },
 });
+
