@@ -136,6 +136,27 @@ export default function RoomScreen() {
                 <Animated.View style={[styles.ambientGlow, { bottom: height * 0.1, right: -width * 0.1, backgroundColor: PURPLE }, animatedAmbient]} />
             </View>
 
+            {/* Leave Button - Top Right */}
+            <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.leaveButtonContainer}
+                onPress={async () => {
+                    if (sound) await sound.unloadAsync();
+                    router.replace('/host');
+                }}
+            >
+                <LinearGradient
+                    colors={['#2A0845', '#6441A5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.gradientBorder, { shadowColor: PURPLE }]}
+                >
+                    <View style={styles.innerButton}>
+                        <Text style={styles.leaveButtonText}>LEAVE</Text>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+
             <View style={styles.contentContainer}>
 
                 {/* Header Information */}
@@ -147,12 +168,13 @@ export default function RoomScreen() {
 
                 {/* Main Interaction Area */}
                 <View style={styles.mainArea}>
-
                     {/* Track Info Display */}
                     {isLoading ? (
-                        <ActivityIndicator size="large" color={CYAN} style={{ marginVertical: 30 }} />
+                        <View style={styles.trackInfoWrapper}>
+                            <ActivityIndicator size="large" color={CYAN} style={{ marginVertical: 30 }} />
+                        </View>
                     ) : currentTrack ? (
-                        <View style={styles.trackContainer}>
+                        <View style={[styles.trackContainer, styles.trackInfoWrapper]}>
                             <Image
                                 source={{ uri: currentTrack.artworkUrl100.replace('100x100', '300x300') }}
                                 style={styles.artwork}
@@ -164,9 +186,9 @@ export default function RoomScreen() {
                             </View>
                         </View>
                     ) : (
-                        <View style={styles.emptyStateContainer}>
+                        <View style={[styles.emptyStateContainer, styles.trackInfoWrapper]}>
                             <Text style={styles.interpretationText}>
-                                {aiInterpretation || "Drop some emojis below and let AI set the vibe!"}
+                                {aiInterpretation || "Tap below to set the vibe!"}
                             </Text>
                         </View>
                     )}
@@ -175,27 +197,6 @@ export default function RoomScreen() {
                         <EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} />
                     </View>
                 </View>
-
-                {/* Leave Button */}
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.leaveButtonContainer}
-                    onPress={async () => {
-                        if (sound) await sound.unloadAsync();
-                        router.replace('/host');
-                    }}
-                >
-                    <LinearGradient
-                        colors={['#2A0845', '#6441A5']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.gradientBorder, { shadowColor: PURPLE }]}
-                    >
-                        <View style={styles.innerButton}>
-                            <Text style={styles.leaveButtonText}>LEAVE ROOM</Text>
-                        </View>
-                    </LinearGradient>
-                </TouchableOpacity>
 
             </View>
         </View>
@@ -261,13 +262,17 @@ const styles = StyleSheet.create({
     mainArea: {
         flex: 1,
         width: '100%',
-        justifyContent: 'center',
+        justifyContent: 'space-between', // Push contents apart (track info to top, selector to bottom)
         alignItems: 'center',
+    },
+    trackInfoWrapper: {
+        flex: 1, // Let track info/loading/empty state take up available space above selector
+        justifyContent: 'center',
+        paddingTop: 20, // Add a bit of space below the header
     },
     trackContainer: {
         alignItems: 'center',
         width: '100%',
-        marginBottom: 30,
     },
     artwork: {
         width: width * 0.6,
@@ -309,13 +314,17 @@ const styles = StyleSheet.create({
     },
     selectorWrapper: {
         width: '100%',
-        marginTop: 'auto', // Push to bottom of main area
+        alignItems: 'center',
+        paddingBottom: 5, // Lowered closer to bottom
     },
     leaveButtonContainer: {
-        width: '60%',
+        position: 'absolute',
+        top: 55,
+        right: 25,
+        zIndex: 100,
     },
     gradientBorder: {
-        borderRadius: 25,
+        borderRadius: 20,
         padding: 2,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
@@ -324,15 +333,16 @@ const styles = StyleSheet.create({
     },
     innerButton: {
         backgroundColor: DARK_BG,
-        borderRadius: 23,
-        paddingVertical: 14,
+        borderRadius: 18,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     leaveButtonText: {
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: '700',
         color: '#FFFFFF',
-        letterSpacing: 2,
+        letterSpacing: 1,
     },
 });
