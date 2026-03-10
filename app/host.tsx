@@ -83,11 +83,13 @@ export default function HostScreen() {
                 roomName: roomName.trim(),
                 isExplicit,
                 createdAt: new Date().toISOString(),
-                status: 'active'
+                status: 'active',
+                playbackMode: 'host', // Default to host playing
+                currentTrack: null // No track initially
             });
 
             // Navigate to the room screen
-            router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}`);
+            router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}&userName=${encodeURIComponent(hostName.trim())}&isHost=true`);
         } catch (error) {
             console.error("Error creating session:", error);
             Alert.alert('Error', 'Failed to create room. Please check your connection and try again.');

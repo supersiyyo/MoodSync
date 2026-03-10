@@ -59,7 +59,7 @@ export const interpretEmojis = async (emojis: string): Promise<{ query: string, 
         };
 
     } catch (error) {
-        console.error("Failed to interpret emojis via AI:", error);
+        console.warn("Failed to interpret emojis via AI:", error);
         // Fallback incase of API failure
         return {
             query: "The Weeknd Blinding Lights",

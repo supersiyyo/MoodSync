@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -18,7 +20,10 @@ const PURPLE = '#BC00FF';
 const DARK_BG = '#050B18';
 
 export default function JoinScreen() {
+    const router = useRouter();
+    const [userName, setUserName] = useState('');
     const [roomCode, setRoomCode] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     const ambientScale = useSharedValue(1);
     const ambientOpacity = useSharedValue(0.3);
@@ -50,6 +55,43 @@ export default function JoinScreen() {
         };
     });
 
+    const handleJoin = async () => {
+        if (!userName.trim()) {
+            Alert.alert('Missing Name', 'Please enter your name to join the vibe.');
+            return;
+        }
+        if (!roomCode.trim() || roomCode.trim().length !== 4) {
+            Alert.alert('Invalid Code', 'Please enter a valid 4-character room code.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const db = require('../services/firebase').db;
+            const roomRef = doc(db, 'sessions', roomCode.trim().toUpperCase());
+            const roomSnap = await getDoc(roomRef);
+
+            if (!roomSnap.exists()) {
+                Alert.alert('Room Not Found', 'Double check the code and try again.');
+                return;
+            }
+
+            const roomData = roomSnap.data();
+            if (roomData.status !== 'active') {
+                Alert.alert('Room Closed', 'This room is no longer active.');
+                return;
+            }
+
+            // Successfully found active room, navigate!
+            router.push(`/room/${roomCode}?roomName=${encodeURIComponent(roomData.roomName)}&userName=${encodeURIComponent(userName.trim())}`);
+        } catch (error) {
+            console.error('Error joining room:', error);
+            Alert.alert('Connection Error', 'Failed to connect. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
             {/* Ambient Background Glows */}
@@ -67,9 +109,9 @@ export default function JoinScreen() {
                         <Text style={styles.titleText}>Join Room</Text>
 
                         <View style={styles.formContainer}>
-                            {/* Room Code Input */}
+                            {/* Your Name Input */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Room Code</Text>
+                                <Text style={styles.label}>Your Name</Text>
                                 <View style={styles.inputWrapper}>
                                     <LinearGradient
                                         colors={[PURPLE, CYAN]}
@@ -79,6 +121,29 @@ export default function JoinScreen() {
                                     >
                                         <TextInput
                                             style={styles.input}
+                                            placeholder="Enter your name"
+                                            placeholderTextColor="rgba(255,255,255,0.4)"
+                                            value={userName}
+                                            onChangeText={setUserName}
+                                            selectionColor={PURPLE}
+                                            editable={!isLoading}
+                                        />
+                                    </LinearGradient>
+                                </View>
+                            </View>
+
+                            {/* Room Code Input */}
+                            <View style={[styles.inputGroup, { marginTop: 25 }]}>
+                                <Text style={styles.label}>Room Code</Text>
+                                <View style={styles.inputWrapper}>
+                                    <LinearGradient
+                                        colors={[PURPLE, CYAN]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.inputGradientBorder}
+                                    >
+                                        <TextInput
+                                            style={[styles.input, styles.codeInput]}
                                             placeholder="e.g. ABCD"
                                             placeholderTextColor="rgba(255,255,255,0.4)"
                                             value={roomCode}
@@ -86,6 +151,7 @@ export default function JoinScreen() {
                                             autoCapitalize="characters"
                                             maxLength={4}
                                             selectionColor={PURPLE}
+                                            editable={!isLoading}
                                         />
                                     </LinearGradient>
                                 </View>
@@ -93,15 +159,24 @@ export default function JoinScreen() {
                         </View>
 
                         {/* Join Room Button */}
-                        <TouchableOpacity activeOpacity={0.8} style={styles.startButtonContainer}>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            style={styles.startButtonContainer}
+                            onPress={handleJoin}
+                            disabled={isLoading}
+                        >
                             <LinearGradient
                                 colors={[PURPLE, '#FF00A0']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
-                                style={[styles.gradientBorder, { shadowColor: PURPLE }]}
+                                style={[styles.gradientBorder, { shadowColor: PURPLE, opacity: isLoading ? 0.7 : 1 }]}
                             >
                                 <View style={styles.innerButton}>
-                                    <Text style={styles.buttonText}>JOIN</Text>
+                                    {isLoading ? (
+                                        <ActivityIndicator color={PURPLE} size="large" />
+                                    ) : (
+                                        <Text style={styles.buttonText}>JOIN</Text>
+                                    )}
                                 </View>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -185,11 +260,14 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         paddingHorizontal: 20,
         paddingVertical: 16,
+        fontSize: 18,
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
+    codeInput: {
         fontSize: 24, // slightly larger for 4-letter codes
         textAlign: 'center',
         letterSpacing: 4,
-        color: '#FFFFFF',
-        fontWeight: '700',
     },
     startButtonContainer: {
         width: '80%',

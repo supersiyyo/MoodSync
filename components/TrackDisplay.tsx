@@ -1,0 +1,104 @@
+import React from 'react';
+import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, View } from 'react-native';
+import { ITunesTrack } from '../services/itunesService';
+
+const { width } = Dimensions.get('window');
+const CYAN = '#00F2FF';
+
+interface TrackDisplayProps {
+    track: ITunesTrack | null;
+    isLoading: boolean;
+    interpretation: string;
+}
+
+export default function TrackDisplay({ track, isLoading, interpretation }: TrackDisplayProps) {
+    if (isLoading) {
+        return (
+            <View style={styles.trackInfoWrapper}>
+                <ActivityIndicator size="large" color={CYAN} style={{ marginVertical: 30 }} />
+            </View>
+        );
+    }
+
+    if (track) {
+        return (
+            <View style={[styles.trackContainer, styles.trackInfoWrapper]}>
+                <Image
+                    source={{ uri: track.artworkUrl100.replace('100x100', '300x300') }}
+                    style={styles.artwork}
+                    resizeMode="contain"
+                />
+                <View style={styles.trackDetails}>
+                    <Text style={styles.trackTitle} numberOfLines={2}>{track.trackName}</Text>
+                    <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
+                    <Text style={styles.interpretationText}>{interpretation}</Text>
+                </View>
+            </View>
+        );
+    }
+
+    return (
+        <View style={[styles.emptyStateContainer, styles.trackInfoWrapper]}>
+            <Text style={styles.interpretationText}>
+                {interpretation || "Tap below to set the vibe!"}
+            </Text>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    trackInfoWrapper: {
+        flex: 1, // Expand to take available middle space
+        justifyContent: 'center',
+        width: '100%',
+    },
+    trackContainer: {
+        alignItems: 'center',
+        width: '100%',
+        flexShrink: 1, // VERY IMPORTANT: allow this entire container to shrink to avoid pushing boundaries
+        paddingVertical: 10,
+    },
+    artwork: {
+        width: width * 0.6,
+        height: width * 0.6,
+        maxWidth: 300,
+        maxHeight: 300,
+        flexShrink: 1, // Ensures image will scale down rather than overflow
+        borderRadius: 20,
+        marginBottom: 20,
+        shadowColor: CYAN,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+    },
+    trackDetails: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        width: '100%',
+        flexShrink: 1, // Wrap text gracefully without dominating height
+    },
+    trackTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#FFF',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    trackArtist: {
+        fontSize: 18,
+        color: CYAN,
+        fontWeight: '500',
+        marginBottom: 15,
+    },
+    interpretationText: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.6)',
+        textAlign: 'center',
+        fontStyle: 'italic',
+        paddingHorizontal: 10,
+    },
+    emptyStateContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+    },
+});
