@@ -3,12 +3,12 @@ import React, { useState } from 'react';
 import {
     Dimensions,
     Modal,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+    View
 } from 'react-native';
 import Animated, {
     FadeIn,
@@ -123,80 +123,80 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
                 animationType="none"
                 onRequestClose={() => setIsSheetVisible(false)}
             >
-                <TouchableWithoutFeedback onPress={() => setIsSheetVisible(false)}>
+                <Animated.View
+                    entering={FadeIn.duration(200)}
+                    exiting={FadeOut.duration(200)}
+                    style={styles.modalOverlay}
+                >
+                    <Pressable
+                        style={StyleSheet.absoluteFill}
+                        onPress={() => setIsSheetVisible(false)}
+                    />
                     <Animated.View
-                        entering={FadeIn.duration(200)}
-                        exiting={FadeOut.duration(200)}
-                        style={styles.modalOverlay}
+                        entering={FadeInDown.springify().damping(20).stiffness(200)}
+                        exiting={FadeOutDown.duration(200)}
+                        style={[styles.bottomSheet, { zIndex: 1 }]}
                     >
-                        <TouchableWithoutFeedback>
-                            <Animated.View
-                                entering={FadeInDown.springify().damping(20).stiffness(200)}
-                                exiting={FadeOutDown.duration(200)}
-                                style={styles.bottomSheet}
-                            >
-                                {/* Header / Current Selection */}
-                                <View style={styles.sheetHeader}>
-                                    <View style={styles.selectionArea}>
-                                        <Text
-                                            style={[styles.selectedText, !selectedEmojis && { color: 'rgba(255,255,255,0.3)' }]}
-                                            numberOfLines={1}
-                                        >
-                                            {selectedEmojis || 'Pick your vibe...'}
-                                        </Text>
-
-                                        {selectedEmojis.length > 0 && (
-                                            <TouchableOpacity onPress={handleBackspace} style={styles.backspaceBtn}>
-                                                <Text style={styles.backspaceIcon}>⌫</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    <TouchableOpacity
-                                        style={[styles.analyzeBtn, (!selectedEmojis || isLoading) && styles.analyzeBtnDisabled]}
-                                        onPress={handleSubmit}
-                                        disabled={!selectedEmojis || isLoading}
-                                    >
-                                        <LinearGradient
-                                            colors={selectedEmojis && !isLoading ? [CYAN, PURPLE] : ['#333', '#444']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            style={styles.analyzeGradient}
-                                        >
-                                            <Text style={styles.analyzeText}>
-                                                {isLoading ? 'ANALYZING...' : 'PLAY VIBE'}
-                                            </Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Emoji Grid */}
-                                <ScrollView
-                                    style={styles.gridScroll}
-                                    contentContainerStyle={styles.gridContent}
-                                    showsVerticalScrollIndicator={false}
+                        {/* Header / Current Selection */}
+                        <View style={styles.sheetHeader}>
+                            <View style={styles.selectionArea}>
+                                <Text
+                                    style={[styles.selectedText, !selectedEmojis && { color: 'rgba(255,255,255,0.3)' }]}
+                                    numberOfLines={1}
                                 >
-                                    {EMOJI_CATEGORIES.map((cat, i) => (
-                                        <View key={i} style={styles.categorySection}>
-                                            <Text style={styles.categoryTitle}>{cat.title}</Text>
-                                            <View style={styles.emojiGrid}>
-                                                {cat.emojis.map((emoji, j) => (
-                                                    <TouchableOpacity
-                                                        key={j}
-                                                        style={styles.emojiCell}
-                                                        onPress={() => handleEmojiTap(emoji)}
-                                                    >
-                                                        <Text style={styles.emojiCellText}>{emoji}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </View>
-                                        </View>
-                                    ))}
-                                </ScrollView>
-                            </Animated.View>
-                        </TouchableWithoutFeedback>
+                                    {selectedEmojis || 'Pick your vibe...'}
+                                </Text>
+
+                                {selectedEmojis.length > 0 && (
+                                    <TouchableOpacity onPress={handleBackspace} style={styles.backspaceBtn}>
+                                        <Text style={styles.backspaceIcon}>⌫</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.analyzeBtn, (!selectedEmojis || isLoading) && styles.analyzeBtnDisabled]}
+                                onPress={handleSubmit}
+                                disabled={!selectedEmojis || isLoading}
+                            >
+                                <LinearGradient
+                                    colors={selectedEmojis && !isLoading ? [CYAN, PURPLE] : ['#333', '#444']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.analyzeGradient}
+                                >
+                                    <Text style={styles.analyzeText}>
+                                        {isLoading ? 'ANALYZING...' : 'PLAY VIBE'}
+                                    </Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Emoji Grid */}
+                        <ScrollView
+                            style={styles.gridScroll}
+                            contentContainerStyle={styles.gridContent}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {EMOJI_CATEGORIES.map((cat, i) => (
+                                <View key={i} style={styles.categorySection}>
+                                    <Text style={styles.categoryTitle}>{cat.title}</Text>
+                                    <View style={styles.emojiGrid}>
+                                        {cat.emojis.map((emoji, j) => (
+                                            <TouchableOpacity
+                                                key={j}
+                                                style={styles.emojiCell}
+                                                onPress={() => handleEmojiTap(emoji)}
+                                            >
+                                                <Text style={styles.emojiCellText}>{emoji}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            ))}
+                        </ScrollView>
                     </Animated.View>
-                </TouchableWithoutFeedback>
+                </Animated.View>
             </Modal>
         </View>
     );
