@@ -41,12 +41,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "WelcomeUntitled.md",
+                "file": "Use Cases & User Stories.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "WelcomeUntitled"
+              "title": "Use Cases & User Stories"
             }
           },
           {
@@ -240,7 +240,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "3fcc7ea7f10a7384",
+  "active": "de17dfa12b01f2d8",
   "lastOpenFiles": [
     "UF Host a Session.md",
     "UF Join a Session.md",
