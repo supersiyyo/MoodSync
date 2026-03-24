@@ -18,3 +18,4 @@ type: Architecture
 
 **Related Documents:**
 - [Features & Limitations](./05-features-and-limitations.md)
+- [Prompting Strategy](./Prompting Strategy.md)
