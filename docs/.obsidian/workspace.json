@@ -4,63 +4,20 @@
     "type": "split",
     "children": [
       {
-        "id": "f0c4497a212ac0e8",
+        "id": "a94b1a2e62cbd0a3",
         "type": "tabs",
         "children": [
           {
-            "id": "f8d4da9deb4a9452",
+            "id": "c742048599e5bef4",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Business Requirements.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Business Requirements"
-            }
-          },
-          {
-            "id": "3e583e247bbbe14b",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "User Roles.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "User Roles"
-            }
-          },
-          {
-            "id": "aad982bac6226d72",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Use Cases & User Stories.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Use Cases & User Stories"
-            }
-          },
-          {
-            "id": "0d84a2d1656e704a",
-            "type": "leaf",
-            "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
-        ],
-        "currentTab": 3
+        ]
       }
     ],
     "direction": "vertical"
@@ -219,18 +176,17 @@
       "bases:Create new base": false
     }
   },
-  "active": "0d84a2d1656e704a",
+  "active": "c742048599e5bef4",
   "lastOpenFiles": [
+    "Business Requirements.md",
+    "User Roles.md",
+    "Use Cases & User Stories.md",
     "UF Host a Session.md",
     "UF Join a Session.md",
     "Untitled.canvas",
     "WelcomeUntitled.md",
     "create a link.md",
-    "Use Cases & User Stories.md",
-    "User Roles.md",
-    "Use Cases & User Stories.md",
     "Architecture & Tech Stack.md",
-    "Business Requirements.md",
     "Features & Limitations.md",
     "MoodSync Project Overview.md"
   ]
