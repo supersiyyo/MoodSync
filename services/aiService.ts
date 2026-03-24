@@ -17,11 +17,9 @@ export const interpretEmojis = async (emojis: string): Promise<{ query: string, 
 
     try {
         const promptText = `
-        You are a music selector AI. I will give you a sequence of emojis representing a user's mood.
-        1. Briefly describe the mood/interpretation in 2 sentences.
-        2. Give me exactly ONE song that most closely matches this mood in the format "Title by Artist".
-        
-        Emojis: ${emojis}
+        I will give you a sequence of emojis representing a user's mood: ${emojis}
+        1. interpret the mood in 1 sentence.
+        2. Give me ONE song that most closely matches the mood in the format "Title by Artist".
 
         Return ONLY a JSON object with this exact structure:
         {"interpretation": "your short sentence", "query": "Song Title Artist Name"}
