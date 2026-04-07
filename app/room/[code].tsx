@@ -16,6 +16,7 @@ import Animated, {
 import EmojiSelector from '../../components/EmojiSelector';
 import HistoryDrawer from '../../components/HistoryDrawer';
 import RoomBackground from '../../components/RoomBackground';
+import SessionHeader from '../../components/SessionHeader';
 import TrackDisplay from '../../components/TrackDisplay';
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
@@ -244,74 +245,18 @@ export default function RoomScreen() {
             <RoomBackground />
 
             {/* 1. Header Section */}
-            <View style={styles.headerSection}>
-                <View style={styles.headerTopRow}>
-                    <View style={styles.headerTextCol}>
-                        <Text style={styles.roomCodeLabel}>ROOM CODE</Text>
-                        <Text style={styles.roomCodeText} numberOfLines={1} adjustsFontSizeToFit>{code}</Text>
-                        <Text style={styles.roomNameText} numberOfLines={1} adjustsFontSizeToFit>{roomName || 'MOODSYNC ROOM'}</Text>
-                    </View>
-
-                    <View style={styles.headerButtonsCol}>
-                        {isHostUser && (
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                style={styles.modeToggleContainer}
-                                onPress={togglePlaybackMode}
-                            >
-                                <LinearGradient
-                                    colors={playbackMode === 'host' ? ['#555', '#777'] : [CYAN, '#0088FF']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={[styles.gradientBorder, { shadowColor: playbackMode === 'host' ? '#000' : CYAN }]}
-                                >
-                                    <View style={styles.innerButton}>
-                                        <Text style={[styles.modeToggleText, playbackMode === 'client' && { color: DARK_BG, textShadowRadius: 0 }]}>
-                                            {playbackMode === 'host' ? 'ONLY HOST' : 'ALL PHONES'}
-                                        </Text>
-                                    </View>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity
-                            activeOpacity={0.8}
-                            style={styles.historyButtonContainer}
-                            onPress={() => setIsHistoryVisible(true)}
-                        >
-                            <LinearGradient
-                                colors={['#333', '#444']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={[styles.gradientBorder, { shadowColor: '#000' }]}
-                            >
-                                <View style={styles.innerButton}>
-                                    <Text style={styles.historyButtonText}>HISTORY</Text>
-                                </View>
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            activeOpacity={0.8}
-                            style={styles.leaveButtonContainer}
-                            onPress={async () => {
-                                if (sound) await sound.unloadAsync();
-                                router.replace('/host');
-                            }}
-                        >
-                            <LinearGradient
-                                colors={['#2A0845', '#6441A5']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={[styles.gradientBorder, { shadowColor: PURPLE }]}
-                            >
-                                <View style={styles.innerButton}>
-                                    <Text style={styles.leaveButtonText}>LEAVE</Text>
-                                </View>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
+            <SessionHeader
+                roomCode={typeof code === 'string' ? code : ''}
+                roomName={typeof roomName === 'string' ? roomName : ''}
+                isHost={isHostUser}
+                playbackMode={playbackMode}
+                onTogglePlaybackMode={togglePlaybackMode}
+                onOpenHistory={() => setIsHistoryVisible(true)}
+                onLeave={async () => {
+                    if (sound) await sound.unloadAsync();
+                    router.replace('/host');
+                }}
+            />
 
             {/* 2. Body Section (Takes up completely remaining responsive space) */}
             <View style={styles.bodySection}>
@@ -359,94 +304,6 @@ const styles = StyleSheet.create({
         paddingBottom: 20, // Safe bottom padding
         justifyContent: 'space-between', // Ensures Header, Body, Footer sit distinct
     },
-    // --- 1. Header Section ---
-    headerSection: {
-        paddingHorizontal: 25,
-        marginBottom: 10,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    headerTextCol: {
-        flex: 1, // Take up leftover space
-    },
-    roomCodeLabel: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: 'rgba(255,255,255,0.5)',
-        letterSpacing: 3,
-        marginBottom: 2,
-    },
-    roomCodeText: {
-        fontSize: 60, // Slightly reduced to fit beside button nicely
-        fontWeight: '900',
-        color: '#FFFFFF',
-        letterSpacing: 8,
-        textShadowColor: CYAN,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 20,
-    },
-    roomNameText: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: PURPLE,
-        letterSpacing: 2,
-        marginTop: 5,
-        textShadowColor: PURPLE,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 10,
-    },
-    headerButtonsCol: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 5,
-    },
-    historyButtonContainer: {
-        marginLeft: 10,
-    },
-    modeToggleContainer: {
-        marginLeft: 10,
-    },
-    leaveButtonContainer: {
-        marginLeft: 10,
-    },
-    gradientBorder: {
-        borderRadius: 20,
-        padding: 2,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    innerButton: {
-        backgroundColor: DARK_BG,
-        borderRadius: 18,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    modeToggleText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.7)',
-        letterSpacing: 1,
-    },
-    historyButtonText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: 'rgba(255,255,255,0.7)',
-        letterSpacing: 1,
-    },
-    leaveButtonText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#FFFFFF',
-        letterSpacing: 1,
-    },
-
     // --- 2. Body Section ---
     bodySection: {
         flex: 1, // Crucial: This section will squish/stretch to take all leftover vertical space
