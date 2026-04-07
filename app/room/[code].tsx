@@ -241,8 +241,8 @@ export default function RoomScreen() {
     return (
         <GestureDetector gesture={swipeGesture}>
         <View style={styles.container}>
-            {/* Ambient Background Glows */}
-            <RoomBackground />
+            {/* Ambient Background Glows / Album Art Overlay */}
+            <RoomBackground artworkUrl={currentTrack?.artworkUrl100} />
 
             {/* 1. Header Section */}
             <SessionHeader

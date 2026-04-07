@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -14,7 +15,11 @@ const { width, height } = Dimensions.get('window');
 const CYAN = '#00F2FF';
 const PURPLE = '#BC00FF';
 
-export default function RoomBackground() {
+interface RoomBackgroundProps {
+    artworkUrl?: string | null;
+}
+
+export default function RoomBackground({ artworkUrl }: RoomBackgroundProps) {
     const ambientScale = useSharedValue(1);
     const ambientOpacity = useSharedValue(0.3);
 
@@ -47,8 +52,24 @@ export default function RoomBackground() {
 
     return (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-            <Animated.View style={[styles.ambientGlow, { top: height * 0.1, left: -width * 0.1, backgroundColor: CYAN }, animatedAmbient]} />
-            <Animated.View style={[styles.ambientGlow, { bottom: height * 0.1, right: -width * 0.1, backgroundColor: PURPLE }, animatedAmbient]} />
+            {artworkUrl ? (
+                <Image
+                    source={{ uri: artworkUrl }}
+                    style={StyleSheet.absoluteFillObject}
+                    contentFit="cover"
+                    blurRadius={100}
+                />
+            ) : null}
+
+            {/* Dark overlay to ensure foreground text/UI remains readable */}
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(5, 11, 24, 0.65)' }]} />
+
+            {!artworkUrl && (
+                <>
+                    <Animated.View style={[styles.ambientGlow, { top: height * 0.1, left: -width * 0.1, backgroundColor: CYAN }, animatedAmbient]} />
+                    <Animated.View style={[styles.ambientGlow, { bottom: height * 0.1, right: -width * 0.1, backgroundColor: PURPLE }, animatedAmbient]} />
+                </>
+            )}
         </View>
     );
 }
