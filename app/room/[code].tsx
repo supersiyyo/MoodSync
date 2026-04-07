@@ -1,6 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -65,6 +66,7 @@ function FloatingEmojiParticle({ emoji, startX, delay }: ParticleProps) {
 export default function RoomScreen() {
     const { code, roomName, userName, isHost } = useLocalSearchParams<{ code: string; roomName: string; userName: string; isHost?: string }>();
     const router = useRouter();
+    const navigation = useNavigation();
     const isHostUser = isHost === 'true';
 
     const [isLoading, setIsLoading] = useState(false);
@@ -119,6 +121,17 @@ export default function RoomScreen() {
         const unsubscribe = onSnapshot(roomRef, async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
+
+                // Handle Session Conclusion (Kick out clients)
+                if (data.status === 'completed' && !isHostUser) {
+                    if (sound) await sound.unloadAsync();
+                    Alert.alert(
+                        "Session Ended", 
+                        "The host has concluded this vibe session. Thanks for syncing!",
+                        [{ text: "OK", onPress: () => router.replace('/') }]
+                    );
+                    return;
+                }
 
                 // Update mode state
                 if (data.playbackMode) {
@@ -231,6 +244,89 @@ export default function RoomScreen() {
         setIsHistoryVisible(true);
     };
 
+    const concludeSession = async (shouldSave = true) => {
+        if (!code || typeof code !== 'string') return;
+        try {
+            const roomRef = doc(db, 'sessions', code);
+            await updateDoc(roomRef, { 
+                status: 'completed',
+                concludedAt: new Date().toISOString()
+            });
+
+            if (shouldSave) {
+                // Save to local device history
+                const historyJson = await AsyncStorage.getItem('MOODSYNC_PAST_SESSIONS');
+                const history = historyJson ? JSON.parse(historyJson) : [];
+                
+                const newHistory = [
+                    {
+                        id: code,
+                        roomName: roomName || 'MOODSYNC ROOM',
+                        timestamp: new Date().toISOString()
+                    },
+                    ...history.filter((s: any) => s.id !== code)
+                ];
+                
+                await AsyncStorage.setItem('MOODSYNC_PAST_SESSIONS', JSON.stringify(newHistory.slice(0, 50)));
+            }
+        } catch (err) {
+            console.error("Failed to conclude session:", err);
+        }
+    };
+
+    const handleLeaveOrEnd = (navAction?: any) => {
+        if (!isHostUser) {
+            if (sound) sound.unloadAsync();
+            if (navAction) navigation.dispatch(navAction);
+            else router.replace('/host');
+            return;
+        }
+
+        Alert.alert(
+            "End & Save Session?",
+            "Do you want to end this vibe for everyone and save the song history to your device?",
+            [
+                {
+                    text: "Just Leave",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (sound) await sound.unloadAsync();
+                        if (navAction) navigation.dispatch(navAction);
+                        else router.replace('/host');
+                    }
+                },
+                {
+                    text: "End & Save",
+                    onPress: async () => {
+                        await concludeSession(true);
+                        if (sound) await sound.unloadAsync();
+                        if (navAction) navigation.dispatch(navAction);
+                        else router.replace('/host');
+                    }
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                }
+            ]
+        );
+    };
+
+    // Intercept native back button for hosts
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!isHostUser) return;
+            
+            // Prevent default behavior of leaving the screen immediately
+            e.preventDefault();
+
+            // Prompt the user
+            handleLeaveOrEnd(e.data.action);
+        });
+
+        return () => unsubscribe();
+    }, [navigation, isHostUser, sound]);
+
     const swipeGesture = Gesture.Pan()
         .onEnd((event) => {
             if (event.translationX < -50) {
@@ -252,10 +348,7 @@ export default function RoomScreen() {
                 playbackMode={playbackMode}
                 onTogglePlaybackMode={togglePlaybackMode}
                 onOpenHistory={() => setIsHistoryVisible(true)}
-                onLeave={async () => {
-                    if (sound) await sound.unloadAsync();
-                    router.replace('/host');
-                }}
+                onLeave={() => handleLeaveOrEnd()}
             />
 
             {/* 2. Body Section (Takes up completely remaining responsive space) */}

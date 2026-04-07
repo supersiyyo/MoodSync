@@ -1,7 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
+import { Clock } from 'lucide-react-native';
 import React, { useEffect } from 'react';
-import { Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -160,6 +161,21 @@ export default function MoodSyncLandingPage() {
                 </View>
               </View>
             </LinearGradient>
+
+            {/* Past Vibes Access */}
+            <Link href="/past-vibes" asChild>
+              <TouchableOpacity activeOpacity={0.8} style={styles.historyButtonContainer}>
+                <LinearGradient
+                  colors={['#1e293b', '#0f172a']}
+                  style={styles.historyButtonGradient}
+                >
+                  <View style={styles.historyButtonInner}>
+                    <Clock size={20} color={CYAN} style={{ marginRight: 10 }} />
+                    <Text style={styles.historyButtonText}>PAST VIBES</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Link>
           </View>
         </SafeAreaView>
       </View>
@@ -300,7 +316,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
     textShadowColor: CYAN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 8,
+  },
+  
+  // History Button Styles
+  historyButtonContainer: {
+    marginTop: 20,
+    width: width * 0.5, // Slightly smaller width for secondary action
+  },
+  historyButtonGradient: {
+    borderRadius: 25,
+    padding: 1.5,
+    shadowColor: CYAN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  historyButtonInner: {
+    backgroundColor: DARK_BG,
+    borderRadius: 23.5,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyButtonText: {
+    color: CYAN,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2,
+    textShadowColor: CYAN,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    textShadowRadius: 5,
   },
 });
