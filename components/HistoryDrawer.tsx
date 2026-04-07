@@ -2,8 +2,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutDown } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutRight, runOnJS } from 'react-native-reanimated';
 import { db } from '../services/firebase';
+import { getGradientFromEmojis } from '../utils/emojiGradient';
 
 const { height } = Dimensions.get('window');
 
@@ -25,9 +27,10 @@ interface HistoryDrawerProps {
     visible: boolean;
     onClose: () => void;
     roomCode: string;
+    currentUser: string;
 }
 
-export default function HistoryDrawer({ visible, onClose, roomCode }: HistoryDrawerProps) {
+export default function HistoryDrawer({ visible, onClose, roomCode, currentUser }: HistoryDrawerProps) {
     const [history, setHistory] = useState<HistoryItem[]>([]);
 
     useEffect(() => {
@@ -54,18 +57,41 @@ export default function HistoryDrawer({ visible, onClose, roomCode }: HistoryDra
         return () => unsubscribe();
     }, [visible, roomCode]);
 
-    const renderItem = ({ item }: { item: HistoryItem }) => (
-        <View style={styles.historyItem}>
-            <View style={styles.emojiContainer}>
-                <Text style={styles.emojiText}>{item.inputEmojis}</Text>
+    const closeGesture = Gesture.Pan()
+        .onEnd((event) => {
+            if (event.translationX > 50) {
+                runOnJS(onClose)();
+            }
+        });
+
+    const renderItem = ({ item }: { item: HistoryItem }) => {
+        const isMe = item.userName === currentUser;
+        const gradientColors = getGradientFromEmojis(item.inputEmojis);
+
+        return (
+            <View style={[styles.chatMessageContainer, isMe ? styles.chatMessageContainerRight : styles.chatMessageContainerLeft]}>
+                {!isMe && <Text style={styles.chatUserName}>{item.userName}</Text>}
+                <LinearGradient
+                    colors={gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.chatMainBubble, isMe ? styles.chatMainBubbleRight : styles.chatMainBubbleLeft]}
+                >
+                    <Text style={styles.chatSongText}>
+                        <Text style={styles.chatSongTitle}>"{item.selectedSong?.title || 'Unknown'}"</Text> by {item.selectedSong?.artist || 'Unknown'}
+                    </Text>
+                </LinearGradient>
+                <LinearGradient
+                    colors={gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.chatSubBubble, isMe ? styles.chatSubBubbleRight : styles.chatSubBubbleLeft]}
+                >
+                    <Text style={styles.chatEmojiText}>{item.inputEmojis}</Text>
+                </LinearGradient>
             </View>
-            <View style={styles.songInfoContainer}>
-                <Text style={styles.userNameText}>{item.userName} sent:</Text>
-                <Text style={styles.songTitle} numberOfLines={1}>{item.selectedSong?.title || 'Unknown Song'}</Text>
-                <Text style={styles.songArtist} numberOfLines={1}>{item.selectedSong?.artist || 'Unknown Artist'}</Text>
-            </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <Modal
@@ -81,38 +107,41 @@ export default function HistoryDrawer({ visible, onClose, roomCode }: HistoryDra
                     style={styles.modalOverlay}
                 >
                     <TouchableWithoutFeedback>
-                        <Animated.View
-                            entering={FadeInDown.springify().damping(20).stiffness(200)}
-                            exiting={FadeOutDown.duration(200)}
-                            style={styles.bottomSheet}
-                        >
-                            <View style={styles.sheetHeader}>
-                                <Text style={styles.headerTitle}>ROOM HISTORY</Text>
-                                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                                    <LinearGradient
-                                        colors={['#333', '#444']}
-                                        style={styles.closeGradient}
-                                    >
-                                        <Text style={styles.closeText}>✕</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-
-                            {history.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <Text style={styles.emptyStateText}>No vibes set yet!</Text>
-                                    <Text style={styles.emptyStateSubtext}>Drop some emojis to start the history.</Text>
+                        <GestureDetector gesture={closeGesture}>
+                            <Animated.View
+                                entering={SlideInRight.springify().damping(20).stiffness(200)}
+                                exiting={SlideOutRight.duration(200)}
+                                style={styles.fullDrawer}
+                            >
+                                <View style={styles.sheetHeader}>
+                                    <Text style={styles.headerTitle}>ROOM HISTORY</Text>
+                                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                                        <LinearGradient
+                                            colors={['#333', '#444']}
+                                            style={styles.closeGradient}
+                                        >
+                                            <Text style={styles.closeText}>✕</Text>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
                                 </View>
-                            ) : (
-                                <FlatList
-                                    data={history}
-                                    keyExtractor={(item) => item.id}
-                                    renderItem={renderItem}
-                                    contentContainerStyle={styles.listContent}
-                                    showsVerticalScrollIndicator={false}
-                                />
-                            )}
-                        </Animated.View>
+
+                                {history.length === 0 ? (
+                                    <View style={styles.emptyState}>
+                                        <Text style={styles.emptyStateText}>No vibes set yet!</Text>
+                                        <Text style={styles.emptyStateSubtext}>Drop some emojis to start the history.</Text>
+                                    </View>
+                                ) : (
+                                    <FlatList
+                                        data={history}
+                                        keyExtractor={(item) => item.id}
+                                        renderItem={renderItem}
+                                        contentContainerStyle={styles.listContent}
+                                        showsVerticalScrollIndicator={false}
+                                        inverted
+                                    />
+                                )}
+                            </Animated.View>
+                        </GestureDetector>
                     </TouchableWithoutFeedback>
                 </Animated.View>
             </TouchableWithoutFeedback>
@@ -124,17 +153,16 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.7)',
+        flexDirection: 'row',
         justifyContent: 'flex-end',
     },
-    bottomSheet: {
+    fullDrawer: {
         width: '100%',
-        height: height * 0.7, // Slightly taller since it's a list
+        height: '100%',
         backgroundColor: '#0F172A',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        paddingTop: 20,
+        paddingTop: 60,
         shadowColor: CYAN,
-        shadowOffset: { width: 0, height: -10 },
+        shadowOffset: { width: -10, height: 0 },
         shadowOpacity: 0.15,
         shadowRadius: 20,
         elevation: 20,
@@ -174,46 +202,62 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingBottom: 50,
     },
-    historyItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1E293B',
-        borderRadius: 16,
-        padding: 15,
-        marginBottom: 12,
+    chatMessageContainer: {
+        marginBottom: 20,
     },
-    emojiContainer: {
-        width: 60,
-        height: 60,
-        backgroundColor: '#0F172A',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
+    chatMessageContainerLeft: {
+        alignItems: 'flex-start',
     },
-    emojiText: {
-        fontSize: 24,
+    chatMessageContainerRight: {
+        alignItems: 'flex-end',
     },
-    songInfoContainer: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    userNameText: {
-        color: CYAN,
+    chatUserName: {
+        color: 'rgba(255,255,255,0.5)',
         fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 2,
+        fontWeight: '600',
+        marginBottom: 4,
+        marginLeft: 4,
         letterSpacing: 0.5,
     },
-    songTitle: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
+    chatMainBubble: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 20,
+        maxWidth: '90%',
+        marginBottom: 0,
     },
-    songArtist: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 14,
+    chatMainBubbleLeft: {
+        borderTopLeftRadius: 4,
+    },
+    chatMainBubbleRight: {
+        borderTopRightRadius: 4,
+    },
+    chatSongText: {
+        fontSize: 16,
+        color: 'rgba(255,255,255,0.9)',
+        lineHeight: 22,
+    },
+    chatSongTitle: {
+        color: '#FFF',
+        fontWeight: 'bold',
+    },
+    chatSubBubble: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        maxWidth: '80%',
+        marginTop: -10,
+        borderWidth: 2,
+        borderColor: '#0F172A',
+    },
+    chatSubBubbleLeft: {
+        borderTopLeftRadius: 4,
+    },
+    chatSubBubbleRight: {
+        borderTopRightRadius: 4,
+    },
+    chatEmojiText: {
+        fontSize: 22,
     },
     emptyState: {
         flex: 1,

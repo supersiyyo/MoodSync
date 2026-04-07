@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,15 +22,17 @@ export default function RootLayout() {
   };
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? CustomDarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false, animation: 'none' }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="explore" />
-        <Stack.Screen name="host" />
-        <Stack.Screen name="join" />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={colorScheme === 'dark' ? CustomDarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false, animation: 'none' }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="explore" />
+          <Stack.Screen name="host" />
+          <Stack.Screen name="join" />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

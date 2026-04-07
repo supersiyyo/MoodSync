@@ -2,8 +2,17 @@ import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 import EmojiSelector from '../../components/EmojiSelector';
 import HistoryDrawer from '../../components/HistoryDrawer';
 import RoomBackground from '../../components/RoomBackground';
@@ -19,12 +28,68 @@ const CYAN = '#00F2FF';
 const PURPLE = '#BC00FF';
 const DARK_BG = '#050B18';
 
+// --- Floating Emoji Particle ---
+interface ParticleProps {
+    emoji: string;
+    startX: number;
+    delay: number;
+}
+
+function FloatingEmojiParticle({ emoji, startX, delay }: ParticleProps) {
+    const translateY = useSharedValue(0);
+    const opacity = useSharedValue(1);
+    const scale = useSharedValue(0);
+
+    useEffect(() => {
+        scale.value = withDelay(delay, withSpring(1.3, { damping: 8, stiffness: 180 }));
+        translateY.value = withDelay(delay, withTiming(-height * 0.5, { duration: 2200 }));
+        opacity.value = withDelay(delay + 900, withTiming(0, { duration: 1000 }));
+    }, []);
+
+    const animStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }, { scale: scale.value }],
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View
+            style={[{ position: 'absolute', left: startX, bottom: 160 }, animStyle]}
+            pointerEvents="none"
+        >
+            <Text style={{ fontSize: 52 }}>{emoji}</Text>
+        </Animated.View>
+    );
+}
+
 export default function RoomScreen() {
     const { code, roomName, userName, isHost } = useLocalSearchParams<{ code: string; roomName: string; userName: string; isHost?: string }>();
     const router = useRouter();
     const isHostUser = isHost === 'true';
 
     const [isLoading, setIsLoading] = useState(false);
+    const [particles, setParticles] = useState<Array<{ id: string; emoji: string; x: number; delay: number }>>([]);
+
+    const triggerFloatingEmojis = useCallback((emojiString: string) => {
+        let emojis: string[] = [];
+        try {
+            const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+            emojis = [...segmenter.segment(emojiString)]
+                .map(s => s.segment)
+                .filter(s => s.trim() !== '' && (s.codePointAt(0) ?? 0) > 127);
+        } catch {
+            emojis = [...emojiString].filter(s => s.trim() !== '' && (s.codePointAt(0) ?? 0) > 127);
+        }
+        const newParticles = emojis.flatMap((emoji, i) =>
+            Array.from({ length: 3 }, (_, j) => ({
+                id: `${Date.now()}-${i}-${j}`,
+                emoji,
+                x: width / 2 - 26 + (Math.random() - 0.5) * 140,
+                delay: i * 180 + j * 90,
+            }))
+        );
+        setParticles(newParticles);
+        setTimeout(() => setParticles([]), 2500);
+    }, []);
     const [currentTrack, setCurrentTrack] = useState<ITunesTrack | null>(null);
     const [aiInterpretation, setAiInterpretation] = useState('');
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
@@ -95,6 +160,7 @@ export default function RoomScreen() {
     const handleEmojiSubmit = async (emojis: string) => {
         if (!code || typeof code !== 'string') return;
 
+        triggerFloatingEmojis(emojis);
         setIsLoading(true);
 
         try {
@@ -160,7 +226,19 @@ export default function RoomScreen() {
         }
     };
 
+    const openHistoryDrawer = () => {
+        setIsHistoryVisible(true);
+    };
+
+    const swipeGesture = Gesture.Pan()
+        .onEnd((event) => {
+            if (event.translationX < -50) {
+                runOnJS(openHistoryDrawer)();
+            }
+        });
+
     return (
+        <GestureDetector gesture={swipeGesture}>
         <View style={styles.container}>
             {/* Ambient Background Glows */}
             <RoomBackground />
@@ -249,13 +327,27 @@ export default function RoomScreen() {
                 <EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} />
             </View>
 
+            {/* Floating Emoji Particles */}
+            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                {particles.map(p => (
+                    <FloatingEmojiParticle
+                        key={p.id}
+                        emoji={p.emoji}
+                        startX={p.x}
+                        delay={p.delay}
+                    />
+                ))}
+            </View>
+
             {/* Modals & Drawers */}
             <HistoryDrawer
                 visible={isHistoryVisible}
                 onClose={() => setIsHistoryVisible(false)}
                 roomCode={typeof code === 'string' ? code : ''}
+                currentUser={typeof userName === 'string' ? userName : ''}
             />
         </View>
+        </GestureDetector>
     );
 }
 
