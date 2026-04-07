@@ -248,8 +248,8 @@ export default function RoomScreen() {
                 <View style={styles.headerTopRow}>
                     <View style={styles.headerTextCol}>
                         <Text style={styles.roomCodeLabel}>ROOM CODE</Text>
-                        <Text style={styles.roomCodeText}>{code}</Text>
-                        <Text style={styles.roomNameText}>{roomName || 'MOODSYNC ROOM'}</Text>
+                        <Text style={styles.roomCodeText} numberOfLines={1} adjustsFontSizeToFit>{code}</Text>
+                        <Text style={styles.roomNameText} numberOfLines={1} adjustsFontSizeToFit>{roomName || 'MOODSYNC ROOM'}</Text>
                     </View>
 
                     <View style={styles.headerButtonsCol}>
