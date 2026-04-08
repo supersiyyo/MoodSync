@@ -6,15 +6,12 @@ type: Architecture
 
 ## Technology Stack
 - **React Native & Expo:** Used for cross-platform mobile development (iOS and Android), simplifying development, testing, and builds.
-- **Firebase:** Manages real-time data, authentication (via Spotify login), and cloud functions.
-  - *Firebase Realtime Database:* Handles live session data, active participants, current moods, and room state.
-  - *Cloud Firestore:* Manages persistent data such as saved playlists, user profiles, and session history.
+- **Firebase:** Manages real-time data and session synchronization.
+  - *Cloud Firestore:* Handles live session data (via snapshots), active participants, current moods, room state, and manages persistent data such as session history.
 
 ## APIs & Integrations
-- **Spotify API:** Acts as the primary integration for music search, recommendations, and playlist management. Firebase cloud functions call the Spotify API to generate and update playlists based on the group's mood.
-  - *Constraint:* Full music playback within a session is restricted to Hosts with an active Spotify Premium subscription.
-- **Apple Music API:** Serves as the alternative integration to handle music playback and playlist creation for users opting out of Spotify. We utilize the Apple Music API specifically because it does not require the user to log into anything, acting as a frictionless secondary music catalog to fetch and queue songs.
-- **Google Gemini API:** Analyzes collective emoji inputs, mapping combinations to mood attributes to drive song recommendations across both streaming platforms.
+- **iTunes Search API:** Acts as the primary integration for fetching song metadata and 30-second audio previews. It is utilized because it does not require the user to log into anything or maintain active subscriptions, acting as a frictionless catalog to fetch and queue songs contextually.
+- **Google Gemini API:** Analyzes collective emoji inputs directly from the client, mapping combinations to music queries, which drive song recommendations for the iTunes search.
 
 **Related Documents:**
 - [Features & Limitations](./05-features-and-limitations.md)

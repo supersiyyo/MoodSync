@@ -8,9 +8,9 @@ type: Documentation
 The core functionality of MoodSync relies on Large Language Models (LLMs) to interpret user emotional state from collective emoji inputs and map them to musical attributes. This ensures that the generated playlists accurately reflect the "vibe" of the room.
 
 ### Current Implementation
-- **Model:** Google Gemini 1.5 Flash (and previously exploring 2.5 Flash).
-- **Function:** Analyzes emoji combinations and converts them into song attributes (e.g., valence, energy, danceability).
-- **Status:** Functional, but identified as a potential high-cost center for production-scale deployments.
+- **Model:** Google Gemini 2.5 Flash Lite.
+- **Function:** Analyzes emoji combinations and converts them directly into a song title and artist query, along with an interpretation sentence.
+- **Status:** Functional, executing directly from the client application.
 
 ## Cost Optimization & Model Exploration
 To ensure the long-term sustainability and scalability of MoodSync, we are exploring more cost-effective LLM alternatives.
@@ -29,7 +29,7 @@ We are currently researching and planning tests for **Gemma 3**, Google's latest
 - **Multilingual Support:** Support for 140+ languages, ensuring MoodSync remains globally accessible.
 
 ### Transition Plan
-1.  **Benchmarking:** Conduct direct comparisons between Gemini 1.5 Flash and Gemma 3 (specifically the 4B or 12B variants) using current MoodSync prompt sets.
+1.  **Benchmarking:** Conduct direct comparisons between Gemini 2.5 Flash Lite and Gemma 3 (specifically the 4B or 12B variants) using current MoodSync prompt sets.
 2.  **Accuracy Verification:** Ensure the mood mapping remains accurate and "human-like" under the smaller model.
 3.  **Infrastructure Assessment:** Evaluate the cost-benefit ratio of hosting Gemma 3 vs. using an API service.
 4.  **Phased Rollout:** If successful, migrate non-critical background tasks first, followed by the core playlist generation engine.

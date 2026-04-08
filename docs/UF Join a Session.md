@@ -10,20 +10,20 @@ To outline the screen-by-screen progression of a user opening the application, e
 ## The Flow
 
 1. **App Launch:** The user opens the MoodSync application.
-2. **Landing Screen:** The user taps the "Sync" button, which navigates them to the role selection screen (Host vs. Join).
-3. **Role Selection:** The user selects "Join".
+2. **Landing Screen:** The user taps the "Sync" button, which navigates them to the `/explore` path for role selection.
+3. **Role Selection (Explore Screen):** The user selects the "Join" path.
 4. **Room Entry Configuration:** - The user is prompted to input their **Name** and the **Room Code** (provided by the Host).
-   - The user taps the large "Enter Room" button.
-5. **System Validation (Backend):** - *Happy Path:* Firebase verifies the Room Code is active and authenticates the user into the session.
-   - *Alternative Path:* If the code is invalid or the session has ended, the UI displays an error message ("Room not found") and reprompts the user to try again.
-6. **Active Session Room:** The user is routed to the main room UI, syncing with the Host's playback state.
-   - *Top/Header UI:* Displays the Room Name, the Host's Name, a "Participants" counter, and a "Leave" button. 
-   - *Main UI:* Displays the currently playing song (if the Host has started the music) and an Emoji button with the helper text, *"Tap below to set the vibe!"*
-7. **Vibe Input:** The user taps the Emoji button, opening the system or custom VAST emoji list.
-8. **Submission:** The user selects their desired emojis and taps "Submit Vibe".
-9. **AI Processing & Aggregation (Backend):** - The system registers the Joiner's emojis and recalculates the room's *average* group mood. 
-   - The AI generates a new prompt based on this updated average, and the music streaming API (Spotify/Apple Music) updates the upcoming queue.
-10. **Playback State Update:** The Joiner's UI returns to the main room view. Their selected emojis are displayed at the bottom of the screen, and the central UI continues to display the currently playing track synced from the Host.
+   - The user taps the large "JOIN" button.
+5. **System Validation:** - *Happy Path:* Firebase Firestore verifies the Room Code exists and allows the user into the session.
+   - *Alternative Path:* If the code is invalid, the UI displays an error message ("Room not found") and reprompts the user.
+6. **Active Session Room:** The user is routed to the main room UI, syncing instantly with the Host's active playback state via Firestore snapshots.
+   - *Top/Header UI:* Displays the Room elements and a "Leave" button. 
+   - *Main UI:* Displays the currently playing song preview and interpretation.
+7. **Vibe Input:** The user uses the Emoji selector at the bottom.
+8. **Submission:** The user submits their selected emojis.
+9. **AI Processing (Client/Firebase):** - The AI processes the Joiner's emojis to form a new intent and queries iTunes API.
+   - This globally updates the `currentTrack` in the room, interrupting current playback to transition to the new vibe. The vibe is logged in the History Drawer.
+10. **Playback State Update:** Both the Host and the Joiner immediately hear the newly selected 30-second preview and see the updated Album Art and AI interpretation.
 
 **Related Documents:**
 - [User Flow: Host a Session](./01-host-session-flow.md)
