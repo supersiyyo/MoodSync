@@ -114,7 +114,7 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
                     </View>
                 </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.mainButtonLabel}>CHOOSE VIBE</Text>
+            <Text style={styles.mainButtonLabel}>VIBE</Text>
 
             {/* Bottom Sheet Modal */}
             <Modal
@@ -204,53 +204,51 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
 
 const styles = StyleSheet.create({
     container: {
-        width: '100%',
         alignItems: 'center',
-        paddingVertical: 20,
     },
     // Main Button Styles
     mainButtonWrapper: {
-        width: width * 0.56, // 80% of original 0.70
-        height: width * 0.56,
+        width: 112,
+        height: 112,
         justifyContent: 'center',
         alignItems: 'center',
     },
     mainButtonShadow: {
         position: 'absolute',
-        width: width * 0.56,
-        height: width * 0.56,
-        borderRadius: (width * 0.56) / 2,
+        width: 112,
+        height: 112,
+        borderRadius: 56,
         backgroundColor: CYAN,
-        filter: 'blur(30px)',
-        opacity: 0.5,
+        filter: 'blur(20px)',
+        opacity: 0.45,
     },
     mainButtonGradient: {
-        width: width * 0.48, // 80% of original 0.60
-        height: width * 0.48,
-        borderRadius: (width * 0.48) / 2,
-        padding: 4,
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        padding: 3,
         shadowColor: PURPLE,
-        shadowOffset: { width: 0, height: 15 },
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.8,
-        shadowRadius: 20,
+        shadowRadius: 16,
         elevation: 15,
     },
     mainButtonInner: {
         flex: 1,
         backgroundColor: DARK_BG,
-        borderRadius: (width * 0.48) / 2 - 4,
+        borderRadius: 45,
         justifyContent: 'center',
         alignItems: 'center',
     },
     mainButtonEmoji: {
-        fontSize: width * 0.24, // 80% of original 0.30
+        fontSize: 44,
     },
     mainButtonLabel: {
-        marginTop: 25,
+        marginTop: 8,
         color: CYAN,
         fontWeight: 'bold',
         letterSpacing: 3,
-        fontSize: 14,
+        fontSize: 11,
     },
 
     // Modal & Sheet Styles

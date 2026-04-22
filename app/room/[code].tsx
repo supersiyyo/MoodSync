@@ -20,7 +20,7 @@ import SessionHeader from '../../components/SessionHeader';
 import TrackDisplay from '../../components/TrackDisplay';
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
-import { ITunesTrack, searchSong } from '../../services/itunesService';
+import { ITunesTrack, searchSongs } from '../../services/itunesService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -94,6 +94,9 @@ export default function RoomScreen() {
     const [currentTrack, setCurrentTrack] = useState<ITunesTrack | null>(null);
     const [aiInterpretation, setAiInterpretation] = useState('');
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+    const [lastEmojis, setLastEmojis] = useState<string | null>(null);
+    const [trackQueue, setTrackQueue] = useState<ITunesTrack[]>([]);
+    const [lastInterpretation, setLastInterpretation] = useState('');
 
     // Playback sync state
     const [playbackMode, setPlaybackMode] = useState<'host' | 'client'>('host');
@@ -158,60 +161,81 @@ export default function RoomScreen() {
         return () => unsubscribe();
     }, [code, sound, isHostUser]);
 
+    const playTrack = async (track: ITunesTrack, interpretation: string, emojis: string) => {
+        if (!code || typeof code !== 'string') return;
+        const playedAt = new Date().toISOString();
+
+        const roomRef = doc(db, 'sessions', code);
+        await updateDoc(roomRef, {
+            currentTrack: {
+                title: track.trackName,
+                artist: track.artistName,
+                artworkUrl: track.artworkUrl100,
+                previewUrl: track.previewUrl,
+                interpretation,
+                playedAt,
+            }
+        });
+
+        const promptsRef = collection(db, 'sessions', code, 'prompts');
+        await addDoc(promptsRef, {
+            inputEmojis: emojis,
+            aiInterpretation: interpretation,
+            selectedSong: { title: track.trackName, artist: track.artistName, previewUrl: track.previewUrl },
+            timestamp: playedAt,
+            userName: typeof userName === 'string' ? userName : 'Anonymous Viber'
+        });
+    };
+
     const handleEmojiSubmit = async (emojis: string) => {
         if (!code || typeof code !== 'string') return;
 
+        setLastEmojis(emojis);
         triggerFloatingEmojis(emojis);
         setIsLoading(true);
 
         try {
-            // 1. Interpret Emojis with AI
             const { query, interpretation } = await interpretEmojis(emojis);
+            const tracks = await searchSongs(query, 5);
 
-            // 2. Search iTunes
-            const track = await searchSong(query);
-
-            if (track) {
-                const playedAt = new Date().toISOString();
-
-                // 3. Update the remote playback pointer
-                const roomRef = doc(db, 'sessions', code);
-                await updateDoc(roomRef, {
-                    currentTrack: {
-                        title: track.trackName,
-                        artist: track.artistName,
-                        artworkUrl: track.artworkUrl100,
-                        previewUrl: track.previewUrl,
-                        interpretation: interpretation,
-                        playedAt: playedAt
-                    }
-                });
-
-                // 4. Log to Firestore History
-                const promptsRef = collection(db, 'sessions', code, 'prompts');
-                await addDoc(promptsRef, {
-                    inputEmojis: emojis,
-                    aiInterpretation: interpretation,
-                    searchQuery: query,
-                    selectedSong: {
-                        title: track.trackName,
-                        artist: track.artistName,
-                        previewUrl: track.previewUrl
-                    },
-                    timestamp: playedAt,
-                    userName: typeof userName === 'string' ? userName : 'Anonymous Viber'
-                });
+            if (tracks.length > 0) {
+                const [first, ...rest] = tracks;
+                setTrackQueue(rest);
+                setLastInterpretation(interpretation);
+                await playTrack(first, interpretation, emojis);
             } else {
-                // Not found, do simple local update
                 setAiInterpretation("Hmm, AI gave us a suggestion but iTunes couldn't find it.");
             }
-
         } catch (error) {
             console.error("Error in emoji submission flow:", error);
             setAiInterpretation("Whoops, something went wrong finding the vibe.");
             Alert.alert("Network Error", "Could not connect to vibe services.");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSkip = async () => {
+        if (!lastEmojis || trackQueue.length === 0) return;
+        const [next, ...rest] = trackQueue;
+        setTrackQueue(rest);
+        setIsLoading(true);
+        try {
+            await playTrack(next, lastInterpretation, lastEmojis);
+        } catch (error) {
+            console.error("Error skipping track:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleReplay = async () => {
+        if (!sound) return;
+        try {
+            await sound.setPositionAsync(0);
+            await sound.playAsync();
+        } catch (err) {
+            console.error('Failed to replay track', err);
         }
     };
 
@@ -269,7 +293,46 @@ export default function RoomScreen() {
 
             {/* 3. Footer Section */}
             <View style={styles.footerSection}>
-                <EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} />
+                <View style={styles.actionRow}>
+                    {/* Rewind */}
+                    <TouchableOpacity
+                        style={[styles.sideButton, (!currentTrack || isLoading) && styles.sideButtonDisabled]}
+                        onPress={handleReplay}
+                        disabled={!currentTrack || isLoading}
+                        activeOpacity={0.7}
+                    >
+                        <LinearGradient
+                            colors={currentTrack && !isLoading ? [PURPLE, '#5500AA'] : ['#333', '#444']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.sideButtonGradient}
+                        >
+                            <Text style={styles.sideButtonIcon}>⟳</Text>
+                            <Text style={styles.sideButtonLabel}>REPLAY</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Emoji Selector */}
+                    <EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} />
+
+                    {/* Skip */}
+                    <TouchableOpacity
+                        style={[styles.sideButton, (trackQueue.length === 0 || isLoading) && styles.sideButtonDisabled]}
+                        onPress={handleSkip}
+                        disabled={trackQueue.length === 0 || isLoading}
+                        activeOpacity={0.7}
+                    >
+                        <LinearGradient
+                            colors={trackQueue.length > 0 && !isLoading ? [CYAN, '#0088FF'] : ['#333', '#444']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.sideButtonGradient}
+                        >
+                            <Text style={styles.sideButtonIcon}>⏭</Text>
+                            <Text style={styles.sideButtonLabel}>SKIP {trackQueue.length > 0 ? `(${trackQueue.length})` : ''}</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Floating Emoji Particles */}
@@ -313,7 +376,38 @@ const styles = StyleSheet.create({
 
     // --- 3. Footer Section ---
     footerSection: {
-        paddingHorizontal: 25,
+        paddingHorizontal: 20,
         paddingBottom: 10,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+    },
+    sideButton: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        overflow: 'hidden',
+    },
+    sideButtonDisabled: {
+        opacity: 0.35,
+    },
+    sideButtonGradient: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 2,
+    },
+    sideButtonIcon: {
+        color: '#FFF',
+        fontSize: 24,
+    },
+    sideButtonLabel: {
+        color: '#FFF',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 1.5,
     },
 });

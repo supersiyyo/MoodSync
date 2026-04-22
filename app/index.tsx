@@ -1,7 +1,10 @@
+import * as AuthSession from 'expo-auth-session';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
-import React, { useEffect } from 'react';
-import { Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Link, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,6 +15,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const SPOTIFY_CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ?? '';
+const SPOTIFY_SCOPES = ['user-read-email', 'user-read-private', 'user-top-read'];
+const SPOTIFY_DISCOVERY = {
+  authorizationEndpoint: 'https://accounts.spotify.com/authorize',
+  tokenEndpoint: 'https://accounts.spotify.com/api/token',
+};
 
 const { width, height } = Dimensions.get('window');
 
@@ -56,11 +68,27 @@ const FloatingEmoji = ({ initialX, initialY, delay }: { initialX: number; initia
 };
 
 export default function MoodSyncLandingPage() {
+  const router = useRouter();
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'moodsync' });
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    { clientId: SPOTIFY_CLIENT_ID, scopes: SPOTIFY_SCOPES, usePKCE: true, redirectUri },
+    SPOTIFY_DISCOVERY
+  );
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      setIsAuthLoading(false);
+      router.push('/explore');
+    } else if (response?.type === 'error' || response?.type === 'cancel' || response?.type === 'dismiss') {
+      setIsAuthLoading(false);
+    }
+  }, [response, router]);
+
   const ambientScale = useSharedValue(1);
   const ambientOpacity = useSharedValue(0.3);
 
   useEffect(() => {
-    // Soft ambient breathing effect
     ambientScale.value = withRepeat(
       withSequence(
         withTiming(1.3, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
@@ -129,37 +157,45 @@ export default function MoodSyncLandingPage() {
             </Link>
           </View>
 
-          {/* Layer 4: Spotify Button Component */}
+          {/* Layer 4: Footer Buttons */}
           <View style={styles.footerContainer}>
-            <LinearGradient
-              colors={[CYAN, PURPLE]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.spotifyButtonGradient}
-            >
-              <View style={styles.spotifyButtonInner}>
-                {/* Background emojis inside the button */}
-                <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 90, bottom: 8, fontSize: 10 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 90, bottom: 8, fontSize: 10 }]} />
-                </View>
+            <Pressable onPress={() => { setIsAuthLoading(true); promptAsync(); }} disabled={!request || isAuthLoading} style={{ opacity: request && !isAuthLoading ? 1 : 0.5 }}>
+              <LinearGradient
+                colors={[CYAN, PURPLE]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.spotifyButtonGradient}
+              >
+                <View style={styles.spotifyButtonInner}>
+                  {/* Background emojis inside the button */}
+                  <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 90, bottom: 8, fontSize: 10 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 90, bottom: 8, fontSize: 10 }]} />
+                  </View>
 
-                {/* Spotify Logo and Text */}
-                <View style={styles.spotifyIconTextRow}>
-                  <Svg width="28" height="28" viewBox="0 0 24 24">
-                    <Path
-                      fill="#FFFFFF"
-                      d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.84-.12-.96-.54-.12-.42.12-.84.54-.96 4.56-1.08 8.52-.66 11.64 1.26.36.24.48.72.36 1.14zm1.44-3.3c-.3.42-.84.54-1.26.24-3.24-1.98-8.16-2.58-11.94-1.44-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.26 9.72-.6 13.5 1.68.42.24.54.84.24 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.54.18-1.14-.12-1.32-.66-.18-.54.12-1.14.66-1.32 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.3.54-.96.72-1.5.42z"
-                    />
-                  </Svg>
-                  <Text style={styles.spotifyText}>Spotify</Text>
+                  {/* Spotify Logo and Text */}
+                  <View style={styles.spotifyIconTextRow}>
+                    {isAuthLoading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Svg width="28" height="28" viewBox="0 0 24 24">
+                          <Path
+                            fill="#FFFFFF"
+                            d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.84-.12-.96-.54-.12-.42.12-.84.54-.96 4.56-1.08 8.52-.66 11.64 1.26.36.24.48.72.36 1.14zm1.44-3.3c-.3.42-.84.54-1.26.24-3.24-1.98-8.16-2.58-11.94-1.44-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.26 9.72-.6 13.5 1.68.42.24.54.84.24 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.54.18-1.14-.12-1.32-.66-.18-.54.12-1.14.66-1.32 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.3.54-.96.72-1.5.42z"
+                          />
+                        </Svg>
+                        <Text style={styles.spotifyText}>Connect Spotify</Text>
+                      </>
+                    )}
+                  </View>
                 </View>
-              </View>
-            </LinearGradient>
+              </LinearGradient>
+            </Pressable>
           </View>
         </SafeAreaView>
       </View>
@@ -174,7 +210,6 @@ const styles = StyleSheet.create({
   },
   viewportGlow: {
     flex: 1,
-    // Emulating the hue-rotate / neon bloom around viewport
     shadowColor: CYAN,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
@@ -206,8 +241,6 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    filter: 'blur(50px)', // Uses web blur or works broadly on newer RN
-    // Fallback shadow for ambient glow if blur is unsupported natively
     shadowColor: CYAN,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
@@ -224,7 +257,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -24,
     left: '50%',
-    marginLeft: -26, // Center the emojis perfectly over 'oo'
+    marginLeft: -26,
     gap: 12,
     zIndex: 10,
   },
@@ -237,7 +270,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 84,
     fontWeight: '800',
-    color: '#E0F8FF', // Soft glowing cyan-white
+    color: '#E0F8FF',
     letterSpacing: 2,
     lineHeight: 94,
     textAlign: 'center',
@@ -245,7 +278,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
   },
-
   headerTextLink: {
     fontSize: 84,
     fontWeight: '800',
@@ -265,8 +297,7 @@ const styles = StyleSheet.create({
     width: width * 0.85,
     height: 70,
     borderRadius: 35,
-    padding: 2.5, // Border thickness
-    // Drop-shadow using accent colors
+    padding: 2.5,
     shadowColor: PURPLE,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
@@ -281,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    overflow: 'hidden', // Contain the floating emojis
+    overflow: 'hidden',
   },
   spotifyIconTextRow: {
     flexDirection: 'row',

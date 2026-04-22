@@ -6,35 +6,31 @@ export interface ITunesTrack {
     artworkUrl100: string;
 }
 
-export const searchSong = async (query: string): Promise<ITunesTrack | null> => {
+export const searchSongs = async (query: string, limit = 5): Promise<ITunesTrack[]> => {
     try {
-        // Encode the query for URL
         const encodedQuery = encodeURIComponent(query);
-        // Search iTunes API for top 1 music track
-        const url = `https://itunes.apple.com/search?term=${encodedQuery}&media=music&entity=song&limit=1`;
+        const url = `https://itunes.apple.com/search?term=${encodedQuery}&media=music&entity=song&limit=${limit}`;
 
         const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`iTunes API error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`iTunes API error: ${response.status}`);
 
         const data = await response.json();
-
-        if (data.results && data.results.length > 0) {
-            const track = data.results[0];
-            return {
-                trackId: track.trackId,
-                trackName: track.trackName,
-                artistName: track.artistName,
-                previewUrl: track.previewUrl,
-                artworkUrl100: track.artworkUrl100
-            };
-        }
-
-        return null; // No results found
+        return (data.results ?? [])
+            .filter((t: any) => t.previewUrl)
+            .map((t: any) => ({
+                trackId: t.trackId,
+                trackName: t.trackName,
+                artistName: t.artistName,
+                previewUrl: t.previewUrl,
+                artworkUrl100: t.artworkUrl100,
+            }));
     } catch (error) {
         console.error("Failed to fetch from iTunes API:", error);
-        return null;
+        return [];
     }
+};
+
+export const searchSong = async (query: string): Promise<ITunesTrack | null> => {
+    const results = await searchSongs(query, 1);
+    return results[0] ?? null;
 };
