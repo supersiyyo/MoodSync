@@ -16,6 +16,7 @@ interface HistoryItem {
     id: string;
     inputEmojis: string;
     userName?: string;
+    aiModel?: string;
     selectedSong: {
         title: string;
         artist: string;
@@ -47,6 +48,7 @@ export default function HistoryDrawer({ visible, onClose, roomCode, currentUser 
                     id: doc.id,
                     inputEmojis: docData.inputEmojis,
                     userName: docData.userName || 'Anonymous',
+                    aiModel: docData.aiModel || null,
                     selectedSong: docData.selectedSong,
                     timestamp: docData.timestamp,
                 } as HistoryItem);
@@ -80,6 +82,9 @@ export default function HistoryDrawer({ visible, onClose, roomCode, currentUser 
                     <Text style={styles.chatSongText}>
                         <Text style={styles.chatSongTitle}>"{item.selectedSong?.title || 'Unknown'}"</Text> by {item.selectedSong?.artist || 'Unknown'}
                     </Text>
+                    {item.aiModel && (
+                        <Text style={styles.chatAiModelText}>AI: {item.aiModel}</Text>
+                    )}
                 </LinearGradient>
                 <LinearGradient
                     colors={gradientColors}
@@ -240,6 +245,12 @@ const styles = StyleSheet.create({
     chatSongTitle: {
         color: '#FFF',
         fontWeight: 'bold',
+    },
+    chatAiModelText: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.4)',
+        marginTop: 4,
+        fontStyle: 'italic',
     },
     chatSubBubble: {
         paddingHorizontal: 16,

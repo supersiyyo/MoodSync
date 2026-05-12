@@ -21,7 +21,7 @@ import TrackDisplay from '../../components/TrackDisplay';
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
 import { ITunesTrack, searchSong } from '../../services/itunesService';
-import { queueSpotifyTrack, searchSpotifyTrack } from '../../services/spotifyService';
+import { getSpotifyPlaybackState, playSpotifyTrack, queueSpotifyTrack, searchSpotifyTrack } from '../../services/spotifyService';
 
 
 const { width, height } = Dimensions.get('window');
@@ -93,8 +93,10 @@ export default function RoomScreen() {
         setParticles(newParticles);
         setTimeout(() => setParticles([]), 2500);
     }, []);
+
     const [currentTrack, setCurrentTrack] = useState<ITunesTrack | null>(null);
     const [aiInterpretation, setAiInterpretation] = useState('');
+    const [aiModel, setAiModel] = useState('');
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
     // Playback sync state
@@ -144,9 +146,13 @@ export default function RoomScreen() {
                         previewUrl: data.currentTrack.previewUrl,
                     } as ITunesTrack);
                     setAiInterpretation(data.currentTrack.interpretation);
+                    setAiModel(data.currentTrack.aiModel || '');
 
                     // Decide if we play locally
-                    if (data.playbackMode === 'client' || isHostUser) {
+                    // Host should NOT play local preview if they are using Spotify (to avoid double audio)
+                    const shouldPlayLocal = (data.playbackMode === 'client') || (isHostUser && !data.spotifyConfig?.accessToken);
+
+                    if (shouldPlayLocal) {
                         try {
                             if (sound) await sound.unloadAsync();
                             const { sound: newSound } = await Audio.Sound.createAsync(
@@ -173,7 +179,7 @@ export default function RoomScreen() {
 
         try {
             // 1. Interpret Emojis with AI
-            const { query, interpretation } = await interpretEmojis(emojis);
+            const { query, interpretation, modelUsed } = await interpretEmojis(emojis);
 
             // 2. Search iTunes
             const track = await searchSong(query);
@@ -193,9 +199,15 @@ export default function RoomScreen() {
                             uri: sTrack.uri,
                             id: sTrack.id
                         };
-                        // Queue it for the host
+                        // Play it for the host
                         if (isHostUser) {
-                            await queueSpotifyTrack(sTrack.uri, spotifyConfig.accessToken);
+                            const success = await playSpotifyTrack(sTrack.uri, spotifyConfig.accessToken);
+                            if (!success) {
+                                Alert.alert(
+                                    "Spotify Playback Issue",
+                                    "We found the song but couldn't start it. Make sure Spotify is open and active on your device!"
+                                );
+                            }
                         }
                     }
                 }
@@ -207,6 +219,7 @@ export default function RoomScreen() {
                         artworkUrl: track.artworkUrl100,
                         previewUrl: track.previewUrl,
                         interpretation: interpretation,
+                        aiModel: modelUsed,
                         playedAt: playedAt,
                         spotifyUri: spotifyTrackData?.uri || null
                     }
@@ -217,6 +230,7 @@ export default function RoomScreen() {
                 await addDoc(promptsRef, {
                     inputEmojis: emojis,
                     aiInterpretation: interpretation,
+                    aiModel: modelUsed,
                     searchQuery: query,
                     selectedSong: {
                         title: track.trackName,
@@ -290,6 +304,7 @@ export default function RoomScreen() {
                     track={currentTrack}
                     isLoading={isLoading}
                     interpretation={aiInterpretation}
+                    aiModel={aiModel}
                 />
             </View>
 

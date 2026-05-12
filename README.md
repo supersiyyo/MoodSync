@@ -20,6 +20,8 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    EXPO_PUBLIC_FIREBASE_APP_ID=
    EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=
    EXPO_PUBLIC_AI_API_KEY=
+   EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
+   EXPO_PUBLIC_SPOTIFY_REDIRECT_URI= # Optional: Defaults to Expo Proxy if left blank
 
 3. Start the app
 

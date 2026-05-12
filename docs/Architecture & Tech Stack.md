@@ -11,10 +11,10 @@ type: Architecture
   - *Cloud Firestore:* Manages persistent data such as saved playlists, user profiles, and session history.
 
 ## APIs & Integrations
-- **Spotify API:** Acts as the primary integration for music search, recommendations, and playlist management. Firebase cloud functions call the Spotify API to generate and update playlists based on the group's mood.
-  - *Constraint:* Full music playback within a session is restricted to Hosts with an active Spotify Premium subscription.
-- **Apple Music API:** Serves as the alternative integration to handle music playback and playlist creation for users opting out of Spotify. We utilize the Apple Music API specifically because it does not require the user to log into anything, acting as a frictionless secondary music catalog to fetch and queue songs.
-- **Google Gemini API:** Analyzes collective emoji inputs, mapping combinations to mood attributes to drive song recommendations across both streaming platforms.
+- **Google Gemini API:** Analyzed collective emoji inputs using a **Resilience Cascade** (primary: `gemini-2.5-flash`, backup: `gemini-2.5-flash-lite`) with exponential backoff to ensure high availability.
+- **Spotify API:** Acts as the primary integration for music search, recommendations, and real-time playback.
+  - *Authentication:* Uses **PKCE-based OAuth** with the **Expo Auth Proxy** for stable cross-environment redirects.
+  - *Playback:* Host-driven immediate playback for Spotify Premium users.
 
 **Related Documents:**
 - [Features & Limitations](./05-features-and-limitations.md)

@@ -139,3 +139,48 @@ export const queueSpotifyTrack = async (trackUri: string, accessToken: string) =
         return false;
     }
 };
+
+/**
+ * Starts immediate playback of a track.
+ */
+export const playSpotifyTrack = async (trackUri: string, accessToken: string) => {
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play`, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                uris: [trackUri]
+            })
+        });
+        return response.ok;
+    } catch (error) {
+        console.error("Spotify play error:", error);
+        return false;
+    }
+};
+
+/**
+ * Gets the current playback state to check for active devices.
+ */
+export const getSpotifyPlaybackState = async (accessToken: string) => {
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+        if (response.status === 204) return { isActive: false };
+        const data = await response.json();
+        return { 
+            isActive: true, 
+            isPlaying: data.is_playing,
+            deviceName: data.device?.name 
+        };
+    } catch (error) {
+        console.error("Spotify playback state error:", error);
+        return { isActive: false };
+    }
+};
