@@ -1,4 +1,4 @@
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export const interpretEmojis = async (emojis: string): Promise<{ query: string, interpretation: string }> => {
     // Fetch the API key dynamically and strip quotes in case it was explicitly quoted in .env

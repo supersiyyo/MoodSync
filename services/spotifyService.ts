@@ -4,9 +4,18 @@ import * as WebBrowser from 'expo-web-browser';
 WebBrowser.maybeCompleteAuthSession();
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID;
-const REDIRECT_URI = AuthSession.makeRedirectUri({
-    scheme: 'moodsync'
+
+// Use the Expo Auth Proxy for development to get a stable https redirect
+const REDIRECT_URI = process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI || AuthSession.makeRedirectUri({
+    useProxy: true,
 });
+
+console.log('--- SPOTIFY REDIRECT CONFIGURATION ---');
+console.log('Current Redirect URI:', REDIRECT_URI);
+console.log('1. Copy this EXACT string.');
+console.log('2. Add it to your Spotify Developer Dashboard.');
+console.log('3. Click SAVE in the dashboard.');
+console.log('---------------------------------------');
 
 const discovery = {
     authorizationEndpoint: 'https://accounts.spotify.com/authorize',
@@ -43,11 +52,14 @@ export const loginWithSpotify = async (): Promise<SpotifyTokenResponse | null> =
             responseType: AuthSession.ResponseType.Code,
         });
 
-        const result = await request.promptAsync(discovery);
+        // Use the native prompt if possible, otherwise use the proxy
+        const result = await request.promptAsync(discovery, { useProxy: true });
 
         if (result.type === 'success') {
             const { code } = result.params;
             return await exchangeCodeForToken(code, request.codeVerifier!);
+        } else if (result.type === 'error') {
+            console.error("Spotify Auth Error Result:", result.error);
         }
         return null;
     } catch (error) {
@@ -58,6 +70,8 @@ export const loginWithSpotify = async (): Promise<SpotifyTokenResponse | null> =
 
 const exchangeCodeForToken = async (code: string, codeVerifier: string): Promise<SpotifyTokenResponse | null> => {
     try {
+        console.log('Exchanging code for token with Redirect URI:', REDIRECT_URI);
+        
         const response = await fetch(discovery.tokenEndpoint, {
             method: 'POST',
             headers: {
@@ -73,6 +87,12 @@ const exchangeCodeForToken = async (code: string, codeVerifier: string): Promise
         });
 
         const data = await response.json();
+        
+        if (data.error) {
+            console.error("Spotify Token Exchange Error:", data.error, data.error_description);
+            return null;
+        }
+
         return {
             accessToken: data.access_token,
             refreshToken: data.refresh_token,
