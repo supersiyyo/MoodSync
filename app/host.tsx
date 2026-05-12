@@ -11,7 +11,10 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
-import { db } from '../services/firebase';
+import { auth, db } from '../services/firebase';
+import { getCurrentUser } from '../services/authService';
+import { loginWithSpotify, SpotifyTokenResponse } from '../services/spotifyService';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +29,7 @@ export default function HostScreen() {
     const [roomName, setRoomName] = useState('');
     const [isExplicit, setIsExplicit] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const [spotifyToken, setSpotifyToken] = useState<SpotifyTokenResponse | null>(null);
 
     const ambientScale = useSharedValue(1);
     const ambientOpacity = useSharedValue(0.3);
@@ -78,24 +82,42 @@ export default function HostScreen() {
             const code = generateRoomCode();
 
             // Save session to Firestore
+            const currentUser = getCurrentUser();
             await setDoc(doc(db, 'sessions', code), {
                 hostName: hostName.trim(),
+                hostId: currentUser?.uid || null,
                 roomName: roomName.trim(),
                 isExplicit,
                 createdAt: new Date().toISOString(),
                 status: 'active',
-                playbackMode: 'host', // Default to host playing
-                currentTrack: null // No track initially
+                playbackMode: 'host',
+                currentTrack: null,
+                spotifyConfig: spotifyToken ? {
+                    accessToken: spotifyToken.accessToken,
+                    refreshToken: spotifyToken.refreshToken,
+                    connectedAt: new Date().toISOString()
+                } : null
             });
 
             // Navigate to the room screen
-            router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}&userName=${encodeURIComponent(hostName.trim())}&isHost=true`);
+            router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}&userName=${encodeURIComponent(hostName.trim())}&isHost=true&userId=${currentUser?.uid || ''}`);
         } catch (error) {
             console.error("Error creating session:", error);
             Alert.alert('Error', 'Failed to create room. Please check your connection and try again.');
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSpotifyConnect = async () => {
+        setIsLoading(true);
+        const token = await loginWithSpotify();
+        if (token) {
+            setSpotifyToken(token);
+        } else {
+            Alert.alert('Spotify Error', 'Failed to connect your Spotify account.');
+        }
+        setIsLoading(false);
     };
 
     return (
@@ -180,6 +202,34 @@ export default function HostScreen() {
                                     <Text style={[styles.switchText, isExplicit && styles.activeSwitchText]}>Yes</Text>
                                 </View>
                             </View>
+                        </View>
+
+                        {/* Spotify Connection Status */}
+                        <View style={styles.spotifyConnectionContainer}>
+                            {spotifyToken ? (
+                                <View style={styles.connectedStatus}>
+                                    <Text style={styles.connectedText}>✅ Spotify Connected</Text>
+                                    <TouchableOpacity onPress={() => setSpotifyToken(null)}>
+                                        <Text style={styles.disconnectText}>Disconnect</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    style={styles.spotifyConnectBtn}
+                                    onPress={handleSpotifyConnect}
+                                    disabled={isLoading}
+                                >
+                                    <LinearGradient
+                                        colors={['#1DB954', '#191414']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.spotifyGradient}
+                                    >
+                                        <Text style={styles.spotifyBtnText}>CONNECT SPOTIFY PREMIUM</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         {/* Start Button */}
@@ -339,6 +389,48 @@ const styles = StyleSheet.create({
         textShadowColor: PURPLE,
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 15,
+    },
+    spotifyConnectionContainer: {
+        width: '100%',
+        marginBottom: 30,
+        alignItems: 'center',
+    },
+    spotifyConnectBtn: {
+        width: '100%',
+        height: 60,
+        borderRadius: 30,
+        overflow: 'hidden',
+        shadowColor: '#1DB954',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    spotifyGradient: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    spotifyBtnText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
+    connectedStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15,
+    },
+    connectedText: {
+        color: '#1DB954',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    disconnectText: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 14,
+        textDecorationLine: 'underline',
     },
 });
 

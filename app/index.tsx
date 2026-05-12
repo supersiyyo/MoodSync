@@ -12,6 +12,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import { ensureAuthenticated } from '../services/authService';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -60,6 +62,11 @@ export default function MoodSyncLandingPage() {
   const ambientOpacity = useSharedValue(0.3);
 
   useEffect(() => {
+    // Ensure the user has a unique ID for the session
+    ensureAuthenticated().catch(err => {
+      console.error("Authentication failed:", err);
+    });
+
     // Soft ambient breathing effect
     ambientScale.value = withRepeat(
       withSequence(

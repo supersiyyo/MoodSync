@@ -21,6 +21,8 @@ import TrackDisplay from '../../components/TrackDisplay';
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
 import { ITunesTrack, searchSong } from '../../services/itunesService';
+import { queueSpotifyTrack, searchSpotifyTrack } from '../../services/spotifyService';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -63,7 +65,7 @@ function FloatingEmojiParticle({ emoji, startX, delay }: ParticleProps) {
 }
 
 export default function RoomScreen() {
-    const { code, roomName, userName, isHost } = useLocalSearchParams<{ code: string; roomName: string; userName: string; isHost?: string }>();
+    const { code, roomName, userName, isHost, userId } = useLocalSearchParams<{ code: string; roomName: string; userName: string; isHost?: string; userId?: string }>();
     const router = useRouter();
     const isHostUser = isHost === 'true';
 
@@ -97,6 +99,7 @@ export default function RoomScreen() {
 
     // Playback sync state
     const [playbackMode, setPlaybackMode] = useState<'host' | 'client'>('host');
+    const [spotifyConfig, setSpotifyConfig] = useState<any>(null);
     const lastPlayedTimestamp = useRef<string | null>(null);
 
     // Audio State
@@ -123,6 +126,10 @@ export default function RoomScreen() {
                 // Update mode state
                 if (data.playbackMode) {
                     setPlaybackMode(data.playbackMode);
+                }
+
+                if (data.spotifyConfig) {
+                    setSpotifyConfig(data.spotifyConfig);
                 }
 
                 // New track handling
@@ -176,6 +183,23 @@ export default function RoomScreen() {
 
                 // 3. Update the remote playback pointer
                 const roomRef = doc(db, 'sessions', code);
+                
+                // 3b. Spotify Integration logic
+                let spotifyTrackData = null;
+                if (spotifyConfig?.accessToken) {
+                    const sTrack = await searchSpotifyTrack(query, spotifyConfig.accessToken);
+                    if (sTrack) {
+                        spotifyTrackData = {
+                            uri: sTrack.uri,
+                            id: sTrack.id
+                        };
+                        // Queue it for the host
+                        if (isHostUser) {
+                            await queueSpotifyTrack(sTrack.uri, spotifyConfig.accessToken);
+                        }
+                    }
+                }
+
                 await updateDoc(roomRef, {
                     currentTrack: {
                         title: track.trackName,
@@ -183,7 +207,8 @@ export default function RoomScreen() {
                         artworkUrl: track.artworkUrl100,
                         previewUrl: track.previewUrl,
                         interpretation: interpretation,
-                        playedAt: playedAt
+                        playedAt: playedAt,
+                        spotifyUri: spotifyTrackData?.uri || null
                     }
                 });
 
@@ -199,7 +224,8 @@ export default function RoomScreen() {
                         previewUrl: track.previewUrl
                     },
                     timestamp: playedAt,
-                    userName: typeof userName === 'string' ? userName : 'Anonymous Viber'
+                    userName: typeof userName === 'string' ? userName : 'Anonymous Viber',
+                    userId: typeof userId === 'string' ? userId : null
                 });
             } else {
                 // Not found, do simple local update

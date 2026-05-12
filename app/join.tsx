@@ -11,6 +11,7 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
+import { getCurrentUser } from '../services/authService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -83,7 +84,8 @@ export default function JoinScreen() {
             }
 
             // Successfully found active room, navigate!
-            router.push(`/room/${roomCode}?roomName=${encodeURIComponent(roomData.roomName)}&userName=${encodeURIComponent(userName.trim())}`);
+            const currentUser = getCurrentUser();
+            router.push(`/room/${roomCode}?roomName=${encodeURIComponent(roomData.roomName)}&userName=${encodeURIComponent(userName.trim())}&userId=${currentUser?.uid || ''}`);
         } catch (error) {
             console.error('Error joining room:', error);
             Alert.alert('Connection Error', 'Failed to connect. Please try again.');
