@@ -1,7 +1,7 @@
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, updateDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -21,7 +21,7 @@ import TrackDisplay from '../../components/TrackDisplay';
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
 import { ITunesTrack, searchSong } from '../../services/itunesService';
-import { getSpotifyPlaybackState, playSpotifyTrack, queueSpotifyTrack, searchSpotifyTrack } from '../../services/spotifyService';
+import { getSpotifyPlaybackState, playSpotifyTrack, queueSpotifyTrack, searchSpotifyTrack, skipToNextSpotifyTrack } from '../../services/spotifyService';
 
 
 const { width, height } = Dimensions.get('window');
@@ -45,8 +45,8 @@ function FloatingEmojiParticle({ emoji, startX, delay }: ParticleProps) {
 
     useEffect(() => {
         scale.value = withDelay(delay, withSpring(1.3, { damping: 8, stiffness: 180 }));
-        translateY.value = withDelay(delay, withTiming(-height * 0.5, { duration: 2200 }));
-        opacity.value = withDelay(delay + 900, withTiming(0, { duration: 1000 }));
+        translateY.value = withDelay(delay, withTiming(-height * 0.7, { duration: 3500 }));
+        opacity.value = withDelay(delay + 2000, withTiming(0, { duration: 1500 }));
     }, []);
 
     const animStyle = useAnimatedStyle(() => ({
@@ -91,7 +91,8 @@ export default function RoomScreen() {
             }))
         );
         setParticles(newParticles);
-        setTimeout(() => setParticles([]), 2500);
+        // Increase timeout to 5s to ensure all animations finish
+        setTimeout(() => setParticles([]), 5000);
     }, []);
 
     const [currentTrack, setCurrentTrack] = useState<ITunesTrack | null>(null);
@@ -125,43 +126,37 @@ export default function RoomScreen() {
             if (docSnap.exists()) {
                 const data = docSnap.data();
 
-                // Update mode state
-                if (data.playbackMode) {
-                    setPlaybackMode(data.playbackMode);
-                }
+                if (data.playbackMode) setPlaybackMode(data.playbackMode);
+                if (data.spotifyConfig) setSpotifyConfig(data.spotifyConfig);
 
-                if (data.spotifyConfig) {
-                    setSpotifyConfig(data.spotifyConfig);
-                }
+                // Use activeTrackId to fetch the correct track from the queue
+                // For now, we'll keep the currentTrack fallback for backward compat
+                const trackData = data.currentTrack;
 
-                // New track handling
-                if (data.currentTrack && data.currentTrack.playedAt !== lastPlayedTimestamp.current) {
-                    lastPlayedTimestamp.current = data.currentTrack.playedAt;
+                if (trackData && trackData.playedAt !== lastPlayedTimestamp.current) {
+                    lastPlayedTimestamp.current = trackData.playedAt;
 
-                    // Update UI for Everyone
                     setCurrentTrack({
-                        trackName: data.currentTrack.title,
-                        artistName: data.currentTrack.artist,
-                        artworkUrl100: data.currentTrack.artworkUrl,
-                        previewUrl: data.currentTrack.previewUrl,
+                        trackName: trackData.title,
+                        artistName: trackData.artist,
+                        artworkUrl100: trackData.artworkUrl,
+                        previewUrl: trackData.previewUrl,
                     } as ITunesTrack);
-                    setAiInterpretation(data.currentTrack.interpretation);
-                    setAiModel(data.currentTrack.aiModel || '');
+                    setAiInterpretation(trackData.interpretation);
+                    setAiModel(trackData.aiModel || '');
 
-                    // Decide if we play locally
-                    // Host should NOT play local preview if they are using Spotify (to avoid double audio)
                     const shouldPlayLocal = (data.playbackMode === 'client') || (isHostUser && !data.spotifyConfig?.accessToken);
 
-                    if (shouldPlayLocal) {
+                    if (shouldPlayLocal && trackData.previewUrl) {
                         try {
                             if (sound) await sound.unloadAsync();
                             const { sound: newSound } = await Audio.Sound.createAsync(
-                                { uri: data.currentTrack.previewUrl },
+                                { uri: trackData.previewUrl },
                                 { shouldPlay: true }
                             );
                             setSound(newSound);
                         } catch (err) {
-                            console.error("Failed to play synced track remotely", err);
+                            console.error("Failed to play synced track", err);
                         }
                     }
                 }
@@ -171,6 +166,85 @@ export default function RoomScreen() {
         return () => unsubscribe();
     }, [code, sound, isHostUser]);
 
+    // Host Management Loop (Syncs Firestore Queue with Spotify)
+    useEffect(() => {
+        if (!isHostUser || !spotifyConfig?.accessToken || !code) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const queueRef = collection(db, 'sessions', code, 'queue');
+                // Use a simple query to avoid composite index requirements
+                const q = query(queueRef, orderBy('submittedAt', 'asc'), limit(20));
+                const querySnapshot = await getDocs(q);
+
+                // Find the first pending item in memory
+                const nextTrackDoc = querySnapshot.docs.find(d => d.data().status === 'pending');
+
+                if (nextTrackDoc) {
+                    const nextTrack = nextTrackDoc.data();
+                    if (nextTrack.spotifyUri) {
+                        console.log(`[Host] Syncing next vibe to Spotify: ${nextTrack.title}`);
+                        await queueSpotifyTrack(nextTrack.spotifyUri, spotifyConfig.accessToken);
+                        await updateDoc(nextTrackDoc.ref, { status: 'queued' });
+                    }
+                }
+            } catch (err) {
+                console.error("DJ Sync Loop Error:", err);
+            }
+        }, 8000);
+
+        return () => clearInterval(interval);
+    }, [isHostUser, spotifyConfig, code]);
+
+    const handleSkip = async () => {
+        if (!isHostUser || !spotifyConfig?.accessToken || !code) return;
+        
+        setIsLoading(true);
+        try {
+            const queueRef = collection(db, 'sessions', code, 'queue');
+            const q = query(queueRef, orderBy('submittedAt', 'asc'), limit(50));
+            const querySnapshot = await getDocs(q);
+
+            // Find the first pending or queued item in memory
+            const nextTrackDoc = querySnapshot.docs.find(d => 
+                ['pending', 'queued'].includes(d.data().status)
+            );
+
+            if (nextTrackDoc) {
+                const nextTrack = nextTrackDoc.data();
+                if (nextTrack.spotifyUri) {
+                    await playSpotifyTrack(nextTrack.spotifyUri, spotifyConfig.accessToken);
+                }
+
+                const roomRef = doc(db, 'sessions', code);
+                await updateDoc(roomRef, {
+                    activeTrackId: nextTrackDoc.id,
+                    currentTrack: {
+                        title: nextTrack.title,
+                        artist: nextTrack.artist,
+                        artworkUrl: nextTrack.artworkUrl,
+                        previewUrl: nextTrack.previewUrl,
+                        interpretation: nextTrack.interpretation,
+                        aiModel: nextTrack.aiModel,
+                        playedAt: new Date().toISOString(),
+                        spotifyUri: nextTrack.spotifyUri
+                    }
+                });
+
+                await updateDoc(nextTrackDoc.ref, { status: 'played' });
+                console.log(`[Host] Skipped to next vibe: ${nextTrack.title}`);
+            } else {
+                await skipToNextSpotifyTrack(spotifyConfig.accessToken);
+                Alert.alert("Queue Empty", "No more guest vibes! Spotify is playing its own mix.");
+            }
+        } catch (error) {
+            console.error("Skip error:", error);
+            Alert.alert("Skip Failed", "Check your Spotify connection.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleEmojiSubmit = async (emojis: string) => {
         if (!code || typeof code !== 'string') return;
 
@@ -178,78 +252,98 @@ export default function RoomScreen() {
         setIsLoading(true);
 
         try {
-            // 1. Interpret Emojis with AI
-            const { query, interpretation, modelUsed } = await interpretEmojis(emojis);
+            // 1. Get history for AI context
+            const history: string[] = [];
+            if (currentTrack) history.push(`${currentTrack.trackName} by ${currentTrack.artistName}`);
+            
+            // 2. Interpret Emojis with AI
+            const { query, interpretation, modelUsed } = await interpretEmojis(emojis, history);
 
-            // 2. Search iTunes
-            const track = await searchSong(query);
+            let finalTitle = "";
+            let finalArtist = "";
+            let finalArtwork = "";
+            let finalPreview = "";
+            let finalSpotifyUri = null;
 
-            if (track) {
-                const playedAt = new Date().toISOString();
-
-                // 3. Update the remote playback pointer
-                const roomRef = doc(db, 'sessions', code);
-                
-                // 3b. Spotify Integration logic
-                let spotifyTrackData = null;
-                if (spotifyConfig?.accessToken) {
-                    const sTrack = await searchSpotifyTrack(query, spotifyConfig.accessToken);
-                    if (sTrack) {
-                        spotifyTrackData = {
-                            uri: sTrack.uri,
-                            id: sTrack.id
-                        };
-                        // Play it for the host
-                        if (isHostUser) {
-                            const success = await playSpotifyTrack(sTrack.uri, spotifyConfig.accessToken);
-                            if (!success) {
-                                Alert.alert(
-                                    "Spotify Playback Issue",
-                                    "We found the song but couldn't start it. Make sure Spotify is open and active on your device!"
-                                );
-                            }
-                        }
-                    }
+            // 3. Search Spotify FIRST
+            if (spotifyConfig?.accessToken) {
+                const sTrack = await searchSpotifyTrack(query, spotifyConfig.accessToken);
+                if (sTrack) {
+                    finalTitle = sTrack.name;
+                    finalArtist = sTrack.artists[0]?.name || "Unknown Artist";
+                    finalArtwork = sTrack.album?.images[0]?.url || "";
+                    finalSpotifyUri = sTrack.uri;
                 }
+            }
 
-                await updateDoc(roomRef, {
-                    currentTrack: {
-                        title: track.trackName,
-                        artist: track.artistName,
-                        artworkUrl: track.artworkUrl100,
-                        previewUrl: track.previewUrl,
-                        interpretation: interpretation,
-                        aiModel: modelUsed,
-                        playedAt: playedAt,
-                        spotifyUri: spotifyTrackData?.uri || null
-                    }
-                });
+            // 4. Search iTunes for fallback/preview
+            const itunesSearchQuery = finalTitle ? `${finalTitle} ${finalArtist}` : query;
+            const itunesTrack = await searchSong(itunesSearchQuery);
 
-                // 4. Log to Firestore History
-                const promptsRef = collection(db, 'sessions', code, 'prompts');
-                await addDoc(promptsRef, {
-                    inputEmojis: emojis,
-                    aiInterpretation: interpretation,
+            if (itunesTrack) {
+                if (!finalTitle) {
+                    finalTitle = itunesTrack.trackName;
+                    finalArtist = itunesTrack.artistName;
+                    finalArtwork = itunesTrack.artworkUrl100;
+                }
+                finalPreview = itunesTrack.previewUrl;
+                if (!finalArtwork) finalArtwork = itunesTrack.artworkUrl100;
+            }
+
+            if (finalTitle) {
+                const playedAt = new Date().toISOString();
+                const roomRef = doc(db, 'sessions', code);
+                const queueRef = collection(db, 'sessions', code, 'queue');
+
+                // 5. Add to the Queue Collection
+                const newTrackDoc = await addDoc(queueRef, {
+                    title: finalTitle,
+                    artist: finalArtist,
+                    artworkUrl: finalArtwork,
+                    previewUrl: finalPreview,
+                    interpretation: interpretation,
                     aiModel: modelUsed,
-                    searchQuery: query,
-                    selectedSong: {
-                        title: track.trackName,
-                        artist: track.artistName,
-                        previewUrl: track.previewUrl
-                    },
-                    timestamp: playedAt,
-                    userName: typeof userName === 'string' ? userName : 'Anonymous Viber',
-                    userId: typeof userId === 'string' ? userId : null
+                    submittedAt: playedAt,
+                    submittedBy: userName || "Anonymous",
+                    spotifyUri: finalSpotifyUri,
+                    status: 'pending',
+                    votes: 0
                 });
+
+                // 6. If no song is active, make this the active one
+                if (!currentTrack) {
+                    await updateDoc(roomRef, {
+                        activeTrackId: newTrackDoc.id,
+                        currentTrack: { // Keeping for backward compat temporarily
+                            title: finalTitle,
+                            artist: finalArtist,
+                            artworkUrl: finalArtwork,
+                            previewUrl: finalPreview,
+                            interpretation: interpretation,
+                            aiModel: modelUsed,
+                            playedAt: playedAt,
+                            spotifyUri: finalSpotifyUri
+                        }
+                    });
+
+                    // Start Spotify playback if host
+                    if (isHostUser && finalSpotifyUri && spotifyConfig?.accessToken) {
+                        await playSpotifyTrack(finalSpotifyUri, spotifyConfig.accessToken);
+                    }
+                } else {
+                    // It's a queue!
+                    if (finalSpotifyUri && isHostUser && spotifyConfig?.accessToken) {
+                        await queueSpotifyTrack(finalSpotifyUri, spotifyConfig.accessToken);
+                    }
+                    Alert.alert("Vibe Queued", `${finalTitle} is next in the set!`);
+                }
             } else {
-                // Not found, do simple local update
-                setAiInterpretation("Hmm, AI gave us a suggestion but iTunes couldn't find it.");
+                setAiInterpretation("Could not find a match for that vibe.");
             }
 
         } catch (error) {
             console.error("Error in emoji submission flow:", error);
-            setAiInterpretation("Whoops, something went wrong finding the vibe.");
-            Alert.alert("Network Error", "Could not connect to vibe services.");
+            Alert.alert("Error", "Could not submit your vibe.");
         } finally {
             setIsLoading(false);
         }
@@ -305,6 +399,8 @@ export default function RoomScreen() {
                     isLoading={isLoading}
                     interpretation={aiInterpretation}
                     aiModel={aiModel}
+                    onSkip={handleSkip}
+                    isHost={isHostUser}
                 />
             </View>
 

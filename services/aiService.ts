@@ -17,7 +17,10 @@ const isRetriableError = (status: number, message: string) => {
     return status === 429 || status === 503 || message.toLowerCase().includes('overloaded') || message.toLowerCase().includes('high demand');
 };
 
-export const interpretEmojis = async (emojis: string): Promise<{ query: string, interpretation: string, modelUsed: string }> => {
+export const interpretEmojis = async (
+    emojis: string, 
+    lastPlayedTracks: string[] = []
+): Promise<{ query: string, interpretation: string, modelUsed: string }> => {
     let AI_API_KEY = process.env.EXPO_PUBLIC_AI_API_KEY;
 
     if (!AI_API_KEY || AI_API_KEY.includes('REPLACE')) {
@@ -31,13 +34,26 @@ export const interpretEmojis = async (emojis: string): Promise<{ query: string, 
 
     AI_API_KEY = AI_API_KEY.replace(/^"|"$/g, '').trim();
 
-    const promptText = `
-    I will give you a sequence of emojis representing a user's mood: ${emojis}
-    1. interpret the mood in 1 sentence.
-    2. Give me ONE song that most closely matches the mood in the format "Title by Artist".
+    const historyContext = lastPlayedTracks.length > 0 
+        ? `The last played songs were: ${lastPlayedTracks.join(', ')}. Use this to ensure a smooth sonic transition.`
+        : "This is the first song of the session.";
 
-    Return ONLY a JSON object with this exact structure:
-    {"interpretation": "your short sentence", "query": "Song Title Artist Name"}
+    const promptText = `
+    You are the "MoodSync DJ," an expert in emoji-based emotional analysis and music curation.
+    
+    User Input Emojis: ${emojis}
+    ${historyContext}
+
+    YOUR TASK:
+    1. DECONSTRUCT the emojis: Analyze how they interact (e.g., contrast, harmony, metaphors).
+    2. DEFINE the "Mood DNA": (Energy, Valence, Tempo, Genre).
+    3. SELECT a song that matches this deep emotional state. Avoid literal interpretations (e.g., 🌊 doesn't have to be a song about the ocean, it could be "fluid" synth-pop).
+
+    Return ONLY a JSON object with this structure:
+    {
+      "interpretation": "A deep 1-sentence analysis of the emoji interaction.",
+      "query": "Song Title by Artist Name"
+    }
     `;
 
     let lastError = null;

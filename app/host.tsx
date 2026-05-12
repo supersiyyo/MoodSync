@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -11,14 +11,13 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
-import { auth, db } from '../services/firebase';
+import { db } from '../services/firebase';
 import { getCurrentUser } from '../services/authService';
-import { loginWithSpotify, SpotifyTokenResponse } from '../services/spotifyService';
-
+import { SpotifyTokenResponse } from '../services/spotifyService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
-// Color Palette
 const CYAN = '#00F2FF';
 const PURPLE = '#BC00FF';
 const DARK_BG = '#050B18';
@@ -35,7 +34,14 @@ export default function HostScreen() {
     const ambientOpacity = useSharedValue(0.3);
 
     useEffect(() => {
-        // Soft ambient breathing effect
+        const loadSpotify = async () => {
+            const data = await AsyncStorage.getItem('spotify_token_data');
+            if (data) {
+                setSpotifyToken(JSON.parse(data));
+            }
+        };
+        loadSpotify();
+
         ambientScale.value = withRepeat(
             withSequence(
                 withTiming(1.3, { duration: 4500, easing: Easing.inOut(Easing.ease) }),
@@ -52,17 +58,14 @@ export default function HostScreen() {
             -1,
             true
         );
-    }, [ambientScale, ambientOpacity]);
+    }, []);
 
-    const animatedAmbient = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: ambientScale.value }],
-            opacity: ambientOpacity.value,
-        };
-    });
+    const animatedAmbient = useAnimatedStyle(() => ({
+        transform: [{ scale: ambientScale.value }],
+        opacity: ambientOpacity.value,
+    }));
 
     const generateRoomCode = () => {
-        // Generate a 4-character alphanumeric code (excluding confusing characters like O, 0, I, 1)
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let result = '';
         for (let i = 0; i < 4; i++) {
@@ -80,8 +83,6 @@ export default function HostScreen() {
         setIsLoading(true);
         try {
             const code = generateRoomCode();
-
-            // Save session to Firestore
             const currentUser = getCurrentUser();
             await setDoc(doc(db, 'sessions', code), {
                 hostName: hostName.trim(),
@@ -99,7 +100,6 @@ export default function HostScreen() {
                 } : null
             });
 
-            // Navigate to the room screen
             router.push(`/room/${code}?roomName=${encodeURIComponent(roomName.trim())}&userName=${encodeURIComponent(hostName.trim())}&isHost=true&userId=${currentUser?.uid || ''}`);
         } catch (error) {
             console.error("Error creating session:", error);
@@ -109,20 +109,8 @@ export default function HostScreen() {
         }
     };
 
-    const handleSpotifyConnect = async () => {
-        setIsLoading(true);
-        const token = await loginWithSpotify();
-        if (token) {
-            setSpotifyToken(token);
-        } else {
-            Alert.alert('Spotify Error', 'Failed to connect your Spotify account.');
-        }
-        setIsLoading(false);
-    };
-
     return (
         <View style={styles.container}>
-            {/* Ambient Background Glows */}
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
                 <Animated.View style={[styles.ambientGlow, { top: height * 0.1, left: -width * 0.1, backgroundColor: CYAN }, animatedAmbient]} />
                 <Animated.View style={[styles.ambientGlow, { bottom: height * 0.1, right: -width * 0.1, backgroundColor: PURPLE }, animatedAmbient]} />
@@ -137,16 +125,10 @@ export default function HostScreen() {
                         <Text style={styles.titleText}>Host Settings</Text>
 
                         <View style={styles.formContainer}>
-                            {/* Your Name Input */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Your Name</Text>
                                 <View style={styles.inputWrapper}>
-                                    <LinearGradient
-                                        colors={[CYAN, PURPLE]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.inputGradientBorder}
-                                    >
+                                    <LinearGradient colors={[CYAN, PURPLE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.inputGradientBorder}>
                                         <TextInput
                                             style={styles.input}
                                             placeholder="Enter your name"
@@ -160,16 +142,10 @@ export default function HostScreen() {
                                 </View>
                             </View>
 
-                            {/* Room Name Input */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Room Name</Text>
                                 <View style={styles.inputWrapper}>
-                                    <LinearGradient
-                                        colors={[CYAN, PURPLE]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.inputGradientBorder}
-                                    >
+                                    <LinearGradient colors={[CYAN, PURPLE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.inputGradientBorder}>
                                         <TextInput
                                             style={styles.input}
                                             placeholder="e.g. VIBECAVE"
@@ -185,76 +161,53 @@ export default function HostScreen() {
                                 </View>
                             </View>
 
-                            {/* Explicit Toggle */}
                             <View style={styles.switchGroup}>
-                                <Text style={styles.label}>Explicit</Text>
+                                <Text style={styles.label}>Explicit Content</Text>
                                 <View style={styles.switchWrapper}>
-                                    <Text style={[styles.switchText, !isExplicit && styles.activeSwitchText]}>No</Text>
+                                    <Text style={[styles.switchText, !isExplicit && styles.activeSwitchText]}>Off</Text>
                                     <Switch
                                         trackColor={{ false: 'rgba(255,255,255,0.2)', true: PURPLE }}
                                         thumbColor={CYAN}
-                                        ios_backgroundColor="rgba(255,255,255,0.2)"
                                         onValueChange={setIsExplicit}
                                         value={isExplicit}
-                                        style={{ marginHorizontal: 10, transform: [{ scale: 1.2 }] }}
                                         disabled={isLoading}
                                     />
-                                    <Text style={[styles.switchText, isExplicit && styles.activeSwitchText]}>Yes</Text>
+                                    <Text style={[styles.switchText, isExplicit && styles.activeSwitchText]}>On</Text>
                                 </View>
                             </View>
                         </View>
 
-                        {/* Spotify Connection Status */}
                         <View style={styles.spotifyConnectionContainer}>
                             {spotifyToken ? (
                                 <View style={styles.connectedStatus}>
-                                    <Text style={styles.connectedText}>✅ Spotify Connected</Text>
-                                    <TouchableOpacity onPress={() => setSpotifyToken(null)}>
-                                        <Text style={styles.disconnectText}>Disconnect</Text>
+                                    <View style={styles.statusDot} />
+                                    <Text style={styles.connectedText}>Vibe Sync Active</Text>
+                                    <TouchableOpacity onPress={async () => {
+                                        await AsyncStorage.removeItem('spotify_token_data');
+                                        setSpotifyToken(null);
+                                    }}>
+                                        <Text style={styles.disconnectText}>Unlink</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : (
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    style={styles.spotifyConnectBtn}
-                                    onPress={handleSpotifyConnect}
-                                    disabled={isLoading}
-                                >
-                                    <LinearGradient
-                                        colors={['#1DB954', '#191414']}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.spotifyGradient}
-                                    >
-                                        <Text style={styles.spotifyBtnText}>CONNECT SPOTIFY PREMIUM</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
+                                <View style={styles.warningBox}>
+                                    <Text style={styles.warningText}>Spotify Not Linked</Text>
+                                    <Link href="/" asChild>
+                                        <TouchableOpacity>
+                                            <Text style={styles.linkActionText}>Connect on Home Screen</Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                </View>
                             )}
                         </View>
 
-                        {/* Start Button */}
-                        <TouchableOpacity
-                            activeOpacity={0.8}
-                            style={styles.startButtonContainer}
-                            onPress={handleStart}
-                            disabled={isLoading}
-                        >
-                            <LinearGradient
-                                colors={[CYAN, PURPLE]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={[styles.gradientBorder, { shadowColor: CYAN, opacity: isLoading ? 0.7 : 1 }]}
-                            >
+                        <TouchableOpacity activeOpacity={0.8} style={styles.startButtonContainer} onPress={handleStart} disabled={isLoading}>
+                            <LinearGradient colors={[CYAN, PURPLE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.gradientBorder, { shadowColor: CYAN, opacity: isLoading ? 0.7 : 1 }]}>
                                 <View style={styles.innerButton}>
-                                    {isLoading ? (
-                                        <ActivityIndicator color={CYAN} size="large" />
-                                    ) : (
-                                        <Text style={styles.buttonText}>START</Text>
-                                    )}
+                                    {isLoading ? <ActivityIndicator color={CYAN} size="large" /> : <Text style={styles.buttonText}>START</Text>}
                                 </View>
                             </LinearGradient>
                         </TouchableOpacity>
-
                     </View>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
@@ -263,174 +216,31 @@ export default function HostScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: DARK_BG,
-    },
-    keyboardView: {
-        flex: 1,
-    },
-    ambientGlow: {
-        position: 'absolute',
-        width: 350,
-        height: 350,
-        borderRadius: 175,
-        filter: 'blur(70px)', // Warning: React Native web only, use shadow for native
-        shadowColor: CYAN,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 70,
-        elevation: 20,
-    },
-    contentContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 25,
-        zIndex: 10,
-    },
-    titleText: {
-        fontSize: 42,
-        fontWeight: '800',
-        color: '#E0F8FF',
-        letterSpacing: 2,
-        marginBottom: 50,
-        textAlign: 'center',
-        textShadowColor: CYAN,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 15,
-    },
-    formContainer: {
-        width: '100%',
-        gap: 25,
-        marginBottom: 50,
-    },
-    inputGroup: {
-        width: '100%',
-    },
-    label: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: 8,
-        marginLeft: 4,
-        textShadowColor: PURPLE,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 10,
-    },
-    inputWrapper: {
-        width: '100%',
-    },
-    inputGradientBorder: {
-        borderRadius: 16,
-        padding: 2, // Border thickness
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    input: {
-        backgroundColor: '#091428', // Slightly lighter than background for depth
-        borderRadius: 14,
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        fontSize: 18,
-        color: '#FFFFFF',
-        fontWeight: '500',
-    },
-    switchGroup: {
-        width: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        paddingHorizontal: 4,
-    },
-    switchWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    switchText: {
-        fontSize: 16,
-        color: 'rgba(255,255,255,0.5)',
-        fontWeight: '600',
-    },
-    activeSwitchText: {
-        color: '#FFFFFF',
-        textShadowColor: CYAN,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
-    },
-    startButtonContainer: {
-        width: '80%',
-        marginTop: 20,
-    },
-    gradientBorder: {
-        borderRadius: 30,
-        padding: 3,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 15,
-        elevation: 15,
-    },
-    innerButton: {
-        backgroundColor: DARK_BG,
-        borderRadius: 27,
-        paddingVertical: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    buttonText: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: '#FFFFFF',
-        letterSpacing: 4,
-        textShadowColor: PURPLE,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 15,
-    },
-    spotifyConnectionContainer: {
-        width: '100%',
-        marginBottom: 30,
-        alignItems: 'center',
-    },
-    spotifyConnectBtn: {
-        width: '100%',
-        height: 60,
-        borderRadius: 30,
-        overflow: 'hidden',
-        shadowColor: '#1DB954',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    spotifyGradient: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    spotifyBtnText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-        letterSpacing: 1,
-    },
-    connectedStatus: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 15,
-    },
-    connectedText: {
-        color: '#1DB954',
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    disconnectText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 14,
-        textDecorationLine: 'underline',
-    },
+    container: { flex: 1, backgroundColor: DARK_BG },
+    keyboardView: { flex: 1 },
+    ambientGlow: { position: 'absolute', width: 350, height: 350, borderRadius: 175, shadowColor: CYAN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 70, elevation: 20 },
+    contentContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, zIndex: 10 },
+    titleText: { fontSize: 42, fontWeight: '800', color: '#E0F8FF', letterSpacing: 2, marginBottom: 50, textAlign: 'center', textShadowColor: CYAN, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 15 },
+    formContainer: { width: '100%', gap: 25, marginBottom: 50 },
+    inputGroup: { width: '100%' },
+    label: { fontSize: 18, fontWeight: '600', color: '#FFFFFF', marginBottom: 8, marginLeft: 4 },
+    inputWrapper: { width: '100%' },
+    inputGradientBorder: { borderRadius: 16, padding: 2 },
+    input: { backgroundColor: '#091428', borderRadius: 14, paddingHorizontal: 20, paddingVertical: 16, fontSize: 18, color: '#FFFFFF' },
+    switchGroup: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    switchWrapper: { flexDirection: 'row', alignItems: 'center' },
+    switchText: { fontSize: 16, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
+    activeSwitchText: { color: '#FFFFFF' },
+    startButtonContainer: { width: '80%', marginTop: 20 },
+    gradientBorder: { borderRadius: 30, padding: 3, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 15, elevation: 15 },
+    innerButton: { backgroundColor: DARK_BG, borderRadius: 27, paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
+    buttonText: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: 4 },
+    spotifyConnectionContainer: { width: '100%', marginBottom: 30, alignItems: 'center' },
+    connectedStatus: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+    statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1DB954', shadowColor: '#1DB954', shadowRadius: 5, shadowOpacity: 1 },
+    connectedText: { color: '#1DB954', fontSize: 18, fontWeight: '700' },
+    disconnectText: { color: 'rgba(255,255,255,0.4)', fontSize: 14, textDecorationLine: 'underline' },
+    warningBox: { alignItems: 'center', gap: 8 },
+    warningText: { color: 'rgba(255,255,255,0.6)', fontSize: 16 },
+    linkActionText: { color: CYAN, fontSize: 16, fontWeight: '700', textDecorationLine: 'underline' },
 });
-

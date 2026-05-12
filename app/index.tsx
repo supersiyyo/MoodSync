@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
-import React, { useEffect } from 'react';
-import { Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -13,6 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { ensureAuthenticated } from '../services/authService';
+import { loginWithSpotify, SpotifyTokenResponse } from '../services/spotifyService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const { width, height } = Dimensions.get('window');
@@ -60,12 +62,24 @@ const FloatingEmoji = ({ initialX, initialY, delay }: { initialX: number; initia
 export default function MoodSyncLandingPage() {
   const ambientScale = useSharedValue(1);
   const ambientOpacity = useSharedValue(0.3);
+  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
+  const [isSpotifyConnecting, setIsSpotifyConnecting] = useState(false);
 
   useEffect(() => {
     // Ensure the user has a unique ID for the session
     ensureAuthenticated().catch(err => {
       console.error("Authentication failed:", err);
     });
+
+    // Load existing Spotify token
+    const loadToken = async () => {
+        const tokenData = await AsyncStorage.getItem('spotify_token_data');
+        if (tokenData) {
+            const parsed = JSON.parse(tokenData);
+            setSpotifyToken(parsed.accessToken);
+        }
+    };
+    loadToken();
 
     // Soft ambient breathing effect
     ambientScale.value = withRepeat(
@@ -85,6 +99,28 @@ export default function MoodSyncLandingPage() {
       true
     );
   }, [ambientScale, ambientOpacity]);
+
+  const handleSpotifyConnect = async () => {
+    if (spotifyToken) {
+        Alert.alert("Spotify Connected", "You are already linked to Spotify! You can now host a room.");
+        return;
+    }
+
+    setIsSpotifyConnecting(true);
+    try {
+        const result = await loginWithSpotify();
+        if (result && result.accessToken) {
+            await AsyncStorage.setItem('spotify_token_data', JSON.stringify(result));
+            setSpotifyToken(result.accessToken);
+            Alert.alert("Success", "Spotify connected! Ready to sync the vibes.");
+        }
+    } catch (error) {
+        console.error("Spotify login error:", error);
+        Alert.alert("Error", "Could not connect to Spotify. Try again later.");
+    } finally {
+        setIsSpotifyConnecting(false);
+    }
+  };
 
   const animatedAmbient = useAnimatedStyle(() => {
     return {
@@ -132,41 +168,52 @@ export default function MoodSyncLandingPage() {
               <Text style={styles.headerText}>Mood</Text>
             </View>
             <Link href="/explore" asChild>
-              <Text style={styles.headerTextLink}>Sync</Text>
+              <TouchableOpacity activeOpacity={0.7}>
+                <Text style={styles.headerTextLink}>Sync</Text>
+              </TouchableOpacity>
             </Link>
           </View>
 
           {/* Layer 4: Spotify Button Component */}
           <View style={styles.footerContainer}>
-            <LinearGradient
-              colors={[CYAN, PURPLE]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.spotifyButtonGradient}
+            <TouchableOpacity 
+                onPress={handleSpotifyConnect} 
+                activeOpacity={0.8}
+                disabled={isSpotifyConnecting}
             >
-              <View style={styles.spotifyButtonInner}>
-                {/* Background emojis inside the button */}
-                <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 90, bottom: 8, fontSize: 10 }]} />
-                  <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 90, bottom: 8, fontSize: 10 }]} />
-                </View>
+                <LinearGradient
+                colors={spotifyToken ? ['#1DB954', '#191414'] : [CYAN, PURPLE]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.spotifyButtonGradient, spotifyToken && { shadowColor: '#1DB954' }]}
+                >
+                <View style={styles.spotifyButtonInner}>
+                    {/* Background emojis inside the button */}
+                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, top: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, top: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { left: 15, bottom: 12 }]} />
+                    <RandomDecorEmoji style={[styles.tinyDecorEmoji, { right: 15, bottom: 12 }]} />
+                    </View>
 
-                {/* Spotify Logo and Text */}
-                <View style={styles.spotifyIconTextRow}>
-                  <Svg width="28" height="28" viewBox="0 0 24 24">
-                    <Path
-                      fill="#FFFFFF"
-                      d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.84-.12-.96-.54-.12-.42.12-.84.54-.96 4.56-1.08 8.52-.66 11.64 1.26.36.24.48.72.36 1.14zm1.44-3.3c-.3.42-.84.54-1.26.24-3.24-1.98-8.16-2.58-11.94-1.44-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.26 9.72-.6 13.5 1.68.42.24.54.84.24 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.54.18-1.14-.12-1.32-.66-.18-.54.12-1.14.66-1.32 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.3.54-.96.72-1.5.42z"
-                    />
-                  </Svg>
-                  <Text style={styles.spotifyText}>Spotify</Text>
+                    {/* Spotify Logo and Text */}
+                    <View style={styles.spotifyIconTextRow}>
+                    <Svg width="28" height="28" viewBox="0 0 24 24">
+                        <Path
+                        fill={spotifyToken ? "#1DB954" : "#FFFFFF"}
+                        d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.52 17.34c-.24.36-.66.48-1.02.24-2.82-1.74-6.36-2.1-10.56-1.14-.42.12-.84-.12-.96-.54-.12-.42.12-.84.54-.96 4.56-1.08 8.52-.66 11.64 1.26.36.24.48.72.36 1.14zm1.44-3.3c-.3.42-.84.54-1.26.24-3.24-1.98-8.16-2.58-11.94-1.44-.48.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.26 9.72-.6 13.5 1.68.42.24.54.84.24 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.54.18-1.14-.12-1.32-.66-.18-.54.12-1.14.66-1.32 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.3.54-.96.72-1.5.42z"
+                        />
+                    </Svg>
+                    <Text style={[styles.spotifyText, spotifyToken && { color: '#1DB954' }]}>
+                        {isSpotifyConnecting ? "Connecting..." : spotifyToken ? "Spotify Linked" : "Sync Spotify"}
+                    </Text>
+                    {spotifyToken && (
+                        <Text style={{ marginLeft: 10, fontSize: 18 }}>✅</Text>
+                    )}
+                    </View>
                 </View>
-              </View>
-            </LinearGradient>
+                </LinearGradient>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </View>

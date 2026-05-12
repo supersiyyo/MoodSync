@@ -1,201 +1,170 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     Dimensions,
     Modal,
     Pressable,
-    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
-    View
+    View,
+    KeyboardAvoidingView,
+    Platform
 } from 'react-native';
 import Animated, {
     FadeIn,
     FadeInDown,
     FadeOut,
-    FadeOutDown
+    FadeOutDown,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+    withRepeat,
+    withSequence
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
 const CYAN = '#00F2FF';
 const PURPLE = '#BC00FF';
-const DARK_BG = '#050B18';
+const DARK_BG = '#0B1222';
 
-const EMOJI_CATEGORIES = [
-    {
-        title: 'Vibes & Feelings',
-        emojis: [
-            '😎', '🥺', '😡', '🥳', '😭', '🤯', '😴', '🤪', '🤠', '👽', '😈', '😇',
-            '😍', '🤩', '🫠', '🙃', '🤔', '🥶', '🥵', '🤢', '🤮', '🤒', '🤕', '🤑'
-        ],
-    },
-    {
-        title: 'Activities & Sports',
-        emojis: [
-            '🏄‍♂️', '🧗‍♀️', '🏂', '�️‍♂️', '🧘‍♀️', '🎮', '🚗', '🚀', '✈️', '⛵', '⚽', '🏀',
-            '🏈', '🎾', '�', '🥊', '🥋', '🤿', '🎣', '🎯', '🎰', '🎟️', '🎭', '🎢'
-        ],
-    },
-    {
-        title: 'Nature & Location',
-        emojis: [
-            '🏔️', '🌋', '⛺', '🏖️', '🏜️', '🏝️', '🏙️', '🌃', '🌉', '🌌', '�🌧️', '⚡',
-            '🔥', '🌊', '🌴', '🌲', '🌵', '🌻', '🌸', '🍂', '🍁', '🍄', '🌍', '🪐'
-        ],
-    },
-    {
-        title: 'Food & Drink',
-        emojis: [
-            '☕', '🍵', '🍷', '🥂', '🍻', '🍹', '🍕', '🍔', '🍟', '🌮', '🍣', '🍦',
-            '🍩', '🍪', '🎂', '🍿', '🍓', '🍉', '🥑', '🌶️', '🧀', '🥩', '🍳', '🥞'
-        ],
-    },
-    {
-        title: 'Music & Art',
-        emojis: [
-            '🎸', '🎧', '🎹', '🎨', '🎬', '🎤', '🥁', '🎷', '📱', '💿', '📼', '📻',
-            '🎻', '🎺', '🎼', '🎵', '🎶', '📓', '📚', '🖋️', '🖌️', '🖍️', '📸', '📽️'
-        ],
-    },
-];
+const EMOJI_REGEX = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g;
 
 interface EmojiSelectorProps {
     onSubmit: (emojis: string) => void;
     isLoading: boolean;
 }
 
+const EmojiParticle = ({ emoji, index }: { emoji: string; index: number }) => {
+    const scale = useSharedValue(0);
+    const rotate = useSharedValue('0deg');
+
+    useEffect(() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 100 });
+        rotate.value = withSequence(
+            withTiming('-10deg', { duration: 100 }),
+            withSpring('0deg')
+        );
+    }, []);
+
+    const style = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }, { rotate: rotate.value }],
+        marginHorizontal: 4,
+    }));
+
+    return (
+        <Animated.View style={style}>
+            <Text style={styles.particleEmoji}>{emoji}</Text>
+        </Animated.View>
+    );
+};
+
 export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProps) {
     const [isSheetVisible, setIsSheetVisible] = useState(false);
-    const [selectedEmojis, setSelectedEmojis] = useState('');
+    const [rawInput, setRawInput] = useState('');
+    const [displayEmojis, setDisplayEmojis] = useState<string[]>([]);
+    const inputRef = useRef<TextInput>(null);
+    const auraOpacity = useSharedValue(0.2);
 
-    const handleEmojiTap = (emoji: string) => {
-        if (selectedEmojis.length < 15) { // Limit to prevent crazy long strings
-            setSelectedEmojis(prev => prev + emoji);
+    useEffect(() => {
+        if (isSheetVisible) {
+            auraOpacity.value = withRepeat(withTiming(0.4, { duration: 2000 }), -1, true);
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 600);
+            return () => clearTimeout(timer);
+        } else {
+            setRawInput('');
+            setDisplayEmojis([]);
+        }
+    }, [isSheetVisible]);
+
+    const handleTextChange = (text: string) => {
+        setRawInput(text);
+        const matches = text.match(EMOJI_REGEX);
+        const filtered = matches ? matches : [];
+        
+        if (filtered.length !== displayEmojis.length) {
+            setDisplayEmojis(filtered);
         }
     };
 
-    const handleBackspace = () => {
-        // Simple backspace (might have issues with complex emojis like family, but fine for basic ones)
-        if (selectedEmojis.length > 0) {
-            const arr = Array.from(selectedEmojis);
-            arr.pop();
-            setSelectedEmojis(arr.join(''));
-        }
-    };
+    const auraStyle = useAnimatedStyle(() => ({
+        opacity: auraOpacity.value * (displayEmojis.length > 0 ? 1.5 : 1),
+        transform: [{ scale: 1 + (displayEmojis.length * 0.05) }],
+    }));
 
     const handleSubmit = () => {
-        if (selectedEmojis.trim().length > 0 && !isLoading) {
-            onSubmit(selectedEmojis.trim());
+        if (displayEmojis.length > 0 && !isLoading) {
+            onSubmit(displayEmojis.join(''));
             setIsSheetVisible(false);
-            setSelectedEmojis('');
         }
     };
 
     return (
         <View style={styles.container}>
-            {/* The Big Smiling Face Button */}
-            <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setIsSheetVisible(true)}
-                disabled={isLoading}
-                style={styles.mainButtonWrapper}
-            >
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setIsSheetVisible(true)} disabled={isLoading} style={styles.mainButtonWrapper}>
                 <Animated.View style={styles.mainButtonShadow} />
-                <LinearGradient
-                    colors={[CYAN, PURPLE]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.mainButtonGradient}
-                >
+                <LinearGradient colors={[CYAN, PURPLE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.mainButtonGradient}>
                     <View style={styles.mainButtonInner}>
                         <Text style={styles.mainButtonEmoji}>😎</Text>
                     </View>
                 </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.mainButtonLabel}>CHOOSE VIBE</Text>
+            <Text style={styles.mainButtonLabel}>EXPRESS VIBE</Text>
 
-            {/* Bottom Sheet Modal */}
-            <Modal
-                visible={isSheetVisible}
-                transparent={true}
-                animationType="none"
-                onRequestClose={() => setIsSheetVisible(false)}
-            >
-                <Animated.View
-                    entering={FadeIn.duration(200)}
-                    exiting={FadeOut.duration(200)}
-                    style={styles.modalOverlay}
-                >
-                    <Pressable
-                        style={StyleSheet.absoluteFill}
-                        onPress={() => setIsSheetVisible(false)}
-                    />
-                    <Animated.View
-                        entering={FadeInDown.springify().damping(20).stiffness(200)}
-                        exiting={FadeOutDown.duration(200)}
-                        style={[styles.bottomSheet, { zIndex: 1 }]}
-                    >
-                        {/* Header / Current Selection */}
-                        <View style={styles.sheetHeader}>
-                            <View style={styles.selectionArea}>
-                                <Text
-                                    style={[styles.selectedText, !selectedEmojis && { color: 'rgba(255,255,255,0.3)' }]}
-                                    numberOfLines={1}
-                                >
-                                    {selectedEmojis || 'Pick your vibe...'}
-                                </Text>
-
-                                {selectedEmojis.length > 0 && (
-                                    <TouchableOpacity onPress={handleBackspace} style={styles.backspaceBtn}>
-                                        <Text style={styles.backspaceIcon}>⌫</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.analyzeBtn, (!selectedEmojis || isLoading) && styles.analyzeBtnDisabled]}
-                                onPress={handleSubmit}
-                                disabled={!selectedEmojis || isLoading}
-                            >
-                                <LinearGradient
-                                    colors={selectedEmojis && !isLoading ? [CYAN, PURPLE] : ['#333', '#444']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={styles.analyzeGradient}
-                                >
-                                    <Text style={styles.analyzeText}>
-                                        {isLoading ? 'ANALYZING...' : 'PLAY VIBE'}
-                                    </Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Emoji Grid */}
-                        <ScrollView
-                            style={styles.gridScroll}
-                            contentContainerStyle={styles.gridContent}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {EMOJI_CATEGORIES.map((cat, i) => (
-                                <View key={i} style={styles.categorySection}>
-                                    <Text style={styles.categoryTitle}>{cat.title}</Text>
-                                    <View style={styles.emojiGrid}>
-                                        {cat.emojis.map((emoji, j) => (
-                                            <TouchableOpacity
-                                                key={j}
-                                                style={styles.emojiCell}
-                                                onPress={() => handleEmojiTap(emoji)}
-                                            >
-                                                <Text style={styles.emojiCellText}>{emoji}</Text>
-                                            </TouchableOpacity>
-                                        ))}
+            <Modal visible={isSheetVisible} transparent={true} animationType="none" onRequestClose={() => setIsSheetVisible(false)}>
+                <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(300)} style={styles.modalOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsSheetVisible(false)} />
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardAvoidingView}>
+                        <Animated.View entering={FadeInDown.springify().damping(25).stiffness(100)} exiting={FadeOutDown.duration(250)} style={styles.bottomSheet}>
+                            <View style={styles.sheetHeader}>
+                                <Animated.View style={[styles.aura, auraStyle]} />
+                                
+                                <Text style={styles.sheetTitle}>Paint your mood</Text>
+                                <Text style={styles.sheetSubtitle}>The AI will listen to the colors of your energy</Text>
+                                
+                                <View style={styles.inputStack}>
+                                    <View style={styles.visualInputArea} pointerEvents="none">
+                                        <View style={styles.emojiRow}>
+                                            {displayEmojis.length === 0 ? (
+                                                <Text style={styles.placeholderText}>✨ Set the vibe...</Text>
+                                            ) : (
+                                                displayEmojis.map((emoji, i) => (
+                                                    <EmojiParticle key={`${emoji}-${i}`} emoji={emoji} index={i} />
+                                                ))
+                                            )}
+                                        </View>
                                     </View>
+
+                                    <TextInput
+                                        ref={inputRef}
+                                        style={styles.realInput}
+                                        value={rawInput}
+                                        onChangeText={handleTextChange}
+                                        maxLength={15}
+                                        caretHidden={true}
+                                        autoComplete="off"
+                                        autoCorrect={false}
+                                        selectionColor="transparent"
+                                    />
                                 </View>
-                            ))}
-                        </ScrollView>
-                    </Animated.View>
+
+                                <TouchableOpacity
+                                    style={[styles.analyzeBtn, (displayEmojis.length === 0 || isLoading) && styles.analyzeBtnDisabled]}
+                                    onPress={handleSubmit}
+                                    disabled={displayEmojis.length === 0 || isLoading}
+                                >
+                                    <LinearGradient colors={displayEmojis.length > 0 && !isLoading ? [CYAN, PURPLE] : ['#1E293B', '#1E293B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.analyzeGradient}>
+                                        <Text style={styles.analyzeText}>{isLoading ? 'DECONSTRUCTING...' : 'TRANSLATE VIBE'}</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
+                    </KeyboardAvoidingView>
                 </Animated.View>
             </Modal>
         </View>
@@ -203,157 +172,28 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
 }
 
 const styles = StyleSheet.create({
-    container: {
-        width: '100%',
-        alignItems: 'center',
-        paddingVertical: 20,
-    },
-    // Main Button Styles
-    mainButtonWrapper: {
-        width: width * 0.56, // 80% of original 0.70
-        height: width * 0.56,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    mainButtonShadow: {
-        position: 'absolute',
-        width: width * 0.56,
-        height: width * 0.56,
-        borderRadius: (width * 0.56) / 2,
-        backgroundColor: CYAN,
-        filter: 'blur(30px)',
-        opacity: 0.5,
-    },
-    mainButtonGradient: {
-        width: width * 0.48, // 80% of original 0.60
-        height: width * 0.48,
-        borderRadius: (width * 0.48) / 2,
-        padding: 4,
-        shadowColor: PURPLE,
-        shadowOffset: { width: 0, height: 15 },
-        shadowOpacity: 0.8,
-        shadowRadius: 20,
-        elevation: 15,
-    },
-    mainButtonInner: {
-        flex: 1,
-        backgroundColor: DARK_BG,
-        borderRadius: (width * 0.48) / 2 - 4,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    mainButtonEmoji: {
-        fontSize: width * 0.24, // 80% of original 0.30
-    },
-    mainButtonLabel: {
-        marginTop: 25,
-        color: CYAN,
-        fontWeight: 'bold',
-        letterSpacing: 3,
-        fontSize: 14,
-    },
-
-    // Modal & Sheet Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        justifyContent: 'flex-end',
-    },
-    bottomSheet: {
-        width: '100%',
-        height: height * 0.6,
-        backgroundColor: '#0F172A', // Slightly lighter than pure background
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        paddingTop: 20,
-        shadowColor: CYAN,
-        shadowOffset: { width: 0, height: -10 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 20,
-    },
-    sheetHeader: {
-        paddingHorizontal: 25,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
-    },
-    selectionArea: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#1E293B',
-        borderRadius: 20,
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        marginBottom: 15,
-        minHeight: 60,
-    },
-    selectedText: {
-        flex: 1,
-        fontSize: 28,
-        color: '#FFF',
-    },
-    backspaceBtn: {
-        padding: 5,
-        marginLeft: 10,
-    },
-    backspaceIcon: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 24,
-    },
-    analyzeBtn: {
-        width: '100%',
-        height: 50,
-        borderRadius: 25,
-        overflow: 'hidden',
-    },
-    analyzeBtnDisabled: {
-        opacity: 0.5,
-    },
-    analyzeGradient: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    analyzeText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 16,
-        letterSpacing: 2,
-    },
-
-    // Grid Styles
-    gridScroll: {
-        flex: 1,
-    },
-    gridContent: {
-        padding: 25,
-        paddingBottom: 50,
-    },
-    categorySection: {
-        marginBottom: 30,
-    },
-    categoryTitle: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 14,
-        fontWeight: 'bold',
-        letterSpacing: 1,
-        marginBottom: 15,
-    },
-    emojiGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 15,
-    },
-    emojiCell: {
-        width: (width - 50 - 45) / 4, // 4 columns, considering padding and gap
-        aspectRatio: 1,
-        backgroundColor: '#1E293B',
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emojiCellText: {
-        fontSize: 32,
-    },
+    container: { width: '100%', alignItems: 'center', paddingVertical: 20 },
+    keyboardAvoidingView: { width: '100%' },
+    mainButtonWrapper: { width: width * 0.56, height: width * 0.56, justifyContent: 'center', alignItems: 'center' },
+    mainButtonShadow: { position: 'absolute', width: width * 0.56, height: width * 0.56, borderRadius: (width * 0.56) / 2, backgroundColor: CYAN, filter: 'blur(30px)', opacity: 0.2 },
+    mainButtonGradient: { width: width * 0.48, height: width * 0.48, borderRadius: (width * 0.48) / 2, padding: 4, shadowColor: PURPLE, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.6, shadowRadius: 15, elevation: 15 },
+    mainButtonInner: { flex: 1, backgroundColor: DARK_BG, borderRadius: (width * 0.48) / 2 - 4, justifyContent: 'center', alignItems: 'center' },
+    mainButtonEmoji: { fontSize: width * 0.24 },
+    mainButtonLabel: { marginTop: 25, color: CYAN, fontWeight: 'bold', letterSpacing: 3, fontSize: 13, opacity: 0.8 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+    bottomSheet: { width: '100%', backgroundColor: '#070C18', borderTopLeftRadius: 50, borderTopRightRadius: 50, paddingTop: 40, paddingBottom: Platform.OS === 'ios' ? 50 : 40, shadowColor: '#000', shadowOffset: { width: 0, height: -20 }, shadowOpacity: 0.6, shadowRadius: 30, elevation: 25 },
+    sheetHeader: { paddingHorizontal: 30, alignItems: 'center' },
+    aura: { position: 'absolute', top: 40, width: width * 0.8, height: 100, backgroundColor: PURPLE, borderRadius: 100, filter: 'blur(60px)', zIndex: -1 },
+    sheetTitle: { fontSize: 26, fontWeight: '900', color: '#FFFFFF', marginBottom: 8, textAlign: 'center', letterSpacing: -0.5 },
+    sheetSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 40, textAlign: 'center', letterSpacing: 0.2, maxWidth: '80%' },
+    inputStack: { width: '100%', height: 100, marginBottom: 40, justifyContent: 'center', alignItems: 'center' },
+    visualInputArea: { position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(255,255,255,0.01)', borderRadius: 30, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+    emojiRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    particleEmoji: { fontSize: 44, color: '#FFF' },
+    placeholderText: { fontSize: 18, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' },
+    realInput: { width: '100%', height: '100%', fontSize: 1, color: 'transparent', backgroundColor: 'transparent' },
+    analyzeBtn: { width: '100%', height: 64, borderRadius: 32, overflow: 'hidden' },
+    analyzeBtnDisabled: { opacity: 0.3 },
+    analyzeGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    analyzeText: { color: '#FFF', fontWeight: '900', fontSize: 17, letterSpacing: 3 },
 });
