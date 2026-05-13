@@ -26,7 +26,7 @@ import NotificationToast, { ToastHandle } from '../../components/NotificationToa
 import { interpretEmojis } from '../../services/aiService';
 import { db } from '../../services/firebase';
 import { ITunesTrack, searchSong } from '../../services/itunesService';
-import { getSpotifyPlaybackState, playSpotifyTrack, queueSpotifyTrack, searchSpotifyTrack, skipToNextSpotifyTrack } from '../../services/spotifyService';
+import { getSpotifyPlaybackState, playSpotifyTrack, queueSpotifyTrack, refreshSpotifyToken, searchSpotifyTrack, skipToNextSpotifyTrack } from '../../services/spotifyService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -115,8 +115,10 @@ export default function RoomScreen() {
     const [currentTrack, setCurrentTrack] = useState<ITunesTrack | null>(null);
     const [aiInterpretation, setAiInterpretation] = useState('');
     const [aiModel, setAiModel] = useState('');
+    const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const [playbackMode, setPlaybackMode] = useState<'host' | 'client'>('host');
+    const [loadingStatus, setLoadingStatus] = useState<string>('');
     const [spotifyConfig, setSpotifyConfig] = useState<any>(null);
     const [sound, setSound] = useState<Audio.Sound | null>(null);
     const lastPlayedTimestamp = useRef<string | null>(null);
@@ -176,6 +178,8 @@ export default function RoomScreen() {
                 const data = docSnap.data();
                 if (data.playbackMode) setPlaybackMode(data.playbackMode);
                 if (data.spotifyConfig) setSpotifyConfig(data.spotifyConfig);
+                setActiveTrackId(data.activeTrackId);
+                
                 const trackData = data.currentTrack;
                 if (trackData && trackData.playedAt !== lastPlayedTimestamp.current) {
                     lastPlayedTimestamp.current = trackData.playedAt;
@@ -185,8 +189,9 @@ export default function RoomScreen() {
                         artworkUrl100: trackData.artworkUrl,
                         previewUrl: trackData.previewUrl,
                     } as ITunesTrack);
-                    setAiInterpretation(trackData.interpretation);
+                    setAiInterpretation(trackData.interpretation || '');
                     setAiModel(trackData.aiModel || '');
+                    
                     const shouldPlayLocal = (data.playbackMode === 'client') || (isHostUser && !data.spotifyConfig?.accessToken);
                     if (shouldPlayLocal && trackData.previewUrl) {
                         try {
@@ -248,6 +253,7 @@ export default function RoomScreen() {
         
         const reqId = ++activeRequestId.current;
         setIsLoading(true);
+        setLoadingStatus("Looking for the next vibe...");
         try {
             const token = await ensureSpotifyActive();
             // Spotify is optional. If no token, we proceed with iTunes only.
@@ -255,7 +261,10 @@ export default function RoomScreen() {
             const queueRef = collection(db, 'sessions', code, 'queue');
             const q = query(queueRef, orderBy('submittedAt', 'asc'), limit(50));
             const querySnapshot = await getDocs(q);
-            const nextTrackDoc = querySnapshot.docs.find(d => ['pending', 'queued'].includes(d.data().status));
+            // Find the next track that isn't currently playing
+            const nextTrackDoc = querySnapshot.docs.find(d => 
+                ['pending', 'queued'].includes(d.data().status) && d.id !== activeTrackId
+            );
             
             if (nextTrackDoc) {
                 const nextTrack = nextTrackDoc.data();
@@ -287,7 +296,7 @@ export default function RoomScreen() {
                 showToast("AI is pivoting the vibe...");
                 const history: string[] = [];
                 if (currentTrack) history.push(`${currentTrack.trackName} - ${currentTrack.artistName}`);
-                const result = await interpretEmojis("Pivot to a fresh mood", history);
+                const result = await interpretEmojis("Pivot to a fresh mood", history, (status) => setLoadingStatus(status));
                 if (result.query) {
                     const itunesTrack = await searchSong(result.query);
                     const spotifySearchQuery = itunesTrack 
@@ -320,7 +329,7 @@ export default function RoomScreen() {
                     }
                 }
             }
-        } catch (error) { console.error("Skip error:", error); showToast("Sync Error"); } finally { setIsLoading(false); }
+        } catch (error) { console.error("Skip error:", error); showToast("Sync Error"); } finally { setIsLoading(false); setLoadingStatus(''); }
     };
 
     const handleEmojiSubmit = async (emojis: string) => {
@@ -332,7 +341,7 @@ export default function RoomScreen() {
             const token = await ensureSpotifyActive();
             const history: string[] = [];
             if (currentTrack) history.push(`${currentTrack.trackName} - ${currentTrack.artistName}`);
-            const result = await interpretEmojis(emojis, history);
+            const result = await interpretEmojis(emojis, history, (status) => setLoadingStatus(status));
 
             if (reqId !== activeRequestId.current) return;
 
@@ -384,7 +393,7 @@ export default function RoomScreen() {
                     showToast(`${itunesTrack?.trackName || result.query} is next!`);
                 }
             }
-        } catch (error) { console.error("Vibe Error:", error); showToast("AI Error"); } finally { setIsLoading(false); }
+        } catch (error) { console.error("Vibe Error:", error); showToast("AI Error"); } finally { setIsLoading(false); setLoadingStatus(''); }
     };
 
     const togglePlaybackMode = async () => {
@@ -404,7 +413,14 @@ export default function RoomScreen() {
             <View style={styles.bodySection}>
                 <TrackDisplay track={currentTrack} isLoading={isLoading} interpretation={aiInterpretation} aiModel={aiModel} isHost={isHostUser} />
             </View>
-            <View style={styles.footerSection}><EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} onSkip={isHostUser ? handleSkip : undefined} /></View>
+            <View style={styles.footerSection}>
+                {isLoading && loadingStatus ? (
+                    <Animated.Text entering={FadeIn} exiting={FadeOut} style={styles.loadingStatusText}>
+                        {loadingStatus}
+                    </Animated.Text>
+                ) : null}
+                <EmojiSelector onSubmit={handleEmojiSubmit} isLoading={isLoading} onSkip={isHostUser ? handleSkip : undefined} />
+            </View>
             
             <NotificationToast ref={toastRef} />
             
@@ -419,6 +435,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: DARK_BG, paddingTop: 40, paddingBottom: 10, justifyContent: 'space-between' },
     bodySection: { flex: 2, paddingHorizontal: 25, justifyContent: 'center', marginTop: -20 },
     footerSection: { width: '100%', paddingBottom: Platform.OS === 'ios' ? 40 : 20, paddingTop: 10 },
+    loadingStatusText: { color: CYAN, fontSize: 14, fontWeight: '600', marginBottom: 15, letterSpacing: 1, opacity: 0.8, textShadowColor: CYAN, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
     toastContainer: { position: 'absolute', top: 0, left: 20, right: 20, zIndex: 999, alignItems: 'center' },
     toastGradient: { paddingHorizontal: 30, paddingVertical: 15, borderRadius: 30, shadowColor: CYAN, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 10 },
     toastText: { color: '#FFF', fontWeight: '800', fontSize: 16, letterSpacing: 1 },

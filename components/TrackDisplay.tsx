@@ -131,11 +131,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     artworkContainer: {
-        width: width * 0.7,
-        height: width * 0.7,
+        width: width * 0.62,
+        height: width * 0.62,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 20,
     },
     orbitCenter: {
         position: 'absolute',
