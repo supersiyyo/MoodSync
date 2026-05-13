@@ -108,7 +108,12 @@ export default function EmojiSelector({ onSubmit, isLoading, onSkip }: EmojiSele
     return (
         <View style={styles.container}>
             {onSkip && (
-                <TouchableOpacity activeOpacity={0.7} onPress={onSkip} style={styles.skipButton}>
+                <TouchableOpacity 
+                    activeOpacity={0.7} 
+                    onPress={onSkip} 
+                    style={[styles.skipButton, isLoading && { opacity: 0.3 }]}
+                    disabled={isLoading}
+                >
                     <Text style={styles.skipIcon}>⏩</Text>
                 </TouchableOpacity>
             )}

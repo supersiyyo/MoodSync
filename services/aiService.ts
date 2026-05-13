@@ -1,7 +1,6 @@
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const GEMINI_MODEL_CASCADE = [
-    "gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite"
@@ -71,13 +70,19 @@ export const interpretEmojis = async (
                 
                 const apiUrl = `${BASE_URL}/${modelName}:generateContent?key=${AI_API_KEY}`;
 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: promptText }] }]
-                    })
+                    }),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     const errText = await response.text();

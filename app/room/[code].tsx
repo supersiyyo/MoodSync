@@ -120,6 +120,7 @@ export default function RoomScreen() {
     const [spotifyConfig, setSpotifyConfig] = useState<any>(null);
     const [sound, setSound] = useState<Audio.Sound | null>(null);
     const lastPlayedTimestamp = useRef<string | null>(null);
+    const activeRequestId = useRef<number>(0);
 
     const toastRef = useRef<ToastHandle>(null);
 
@@ -245,10 +246,11 @@ export default function RoomScreen() {
     const handleSkip = async () => {
         if (!isHostUser || !code) return;
         
+        const reqId = ++activeRequestId.current;
         setIsLoading(true);
         try {
             const token = await ensureSpotifyActive();
-            if (!token) throw new Error("No Spotify Token");
+            // Spotify is optional. If no token, we proceed with iTunes only.
 
             const queueRef = collection(db, 'sessions', code, 'queue');
             const q = query(queueRef, orderBy('submittedAt', 'asc'), limit(50));
@@ -263,6 +265,8 @@ export default function RoomScreen() {
                     if (!success) showToast("Spotify is sleeping! Open it ✌️");
                 }
                 
+                if (reqId !== activeRequestId.current) return;
+
                 const roomRef = doc(db, 'sessions', code);
                 await updateDoc(roomRef, {
                     activeTrackId: nextTrackDoc.id,
@@ -289,7 +293,14 @@ export default function RoomScreen() {
                     const spotifySearchQuery = itunesTrack 
                         ? `track:${itunesTrack.trackName} artist:${itunesTrack.artistName}` 
                         : result.query;
-                    const finalSpotifyUri = await searchSpotifyTrack(spotifySearchQuery, token);
+                    
+                    let finalSpotifyUri = null;
+                    if (token) {
+                        finalSpotifyUri = await searchSpotifyTrack(spotifySearchQuery, token);
+                    }
+
+                    if (reqId !== activeRequestId.current) return;
+
                     if (finalSpotifyUri || itunesTrack) {
                         if (finalSpotifyUri) await playSpotifyTrack(finalSpotifyUri, token);
                         const roomRef = doc(db, 'sessions', code);
@@ -314,6 +325,7 @@ export default function RoomScreen() {
 
     const handleEmojiSubmit = async (emojis: string) => {
         if (!code || typeof code !== 'string') return;
+        const reqId = ++activeRequestId.current;
         triggerFloatingEmojis(emojis);
         setIsLoading(true);
         try {
@@ -321,6 +333,9 @@ export default function RoomScreen() {
             const history: string[] = [];
             if (currentTrack) history.push(`${currentTrack.trackName} - ${currentTrack.artistName}`);
             const result = await interpretEmojis(emojis, history);
+
+            if (reqId !== activeRequestId.current) return;
+
             if (result.query) {
                 const itunesTrack = await searchSong(result.query);
                 let finalSpotifyUri = null;

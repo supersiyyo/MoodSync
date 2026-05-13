@@ -177,6 +177,17 @@ export const playSpotifyTrack = async (trackUri: string, accessToken?: string) =
 
     let currentToken = accessToken;
 
+    // If no token provided, get from storage
+    if (!currentToken) {
+        const tokenData = await AsyncStorage.getItem('spotify_token_data');
+        if (tokenData) currentToken = JSON.parse(tokenData).accessToken;
+    }
+
+    if (!currentToken) {
+        console.log("[Spotify] No access token available. Skipping playback.");
+        return false;
+    }
+
     const playAttempt = async (token: string, targetDeviceId?: string) => {
         const url = targetDeviceId 
             ? `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`
@@ -196,14 +207,6 @@ export const playSpotifyTrack = async (trackUri: string, accessToken?: string) =
     };
 
     try {
-        // If no token provided, get from storage
-        if (!currentToken) {
-            const tokenData = await AsyncStorage.getItem('spotify_token_data');
-            if (tokenData) currentToken = JSON.parse(tokenData).accessToken;
-        }
-
-        if (!currentToken) return false;
-
         let response = await playAttempt(currentToken);
 
         // If 401 (Unauthorized), refresh and retry
