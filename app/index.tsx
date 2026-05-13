@@ -15,6 +15,7 @@ import Svg, { Path } from 'react-native-svg';
 import { ensureAuthenticated } from '../services/authService';
 import { loginWithSpotify, SpotifyTokenResponse } from '../services/spotifyService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NotificationToast, { ToastHandle } from '../components/NotificationToast';
 
 
 const { width, height } = Dimensions.get('window');
@@ -64,6 +65,7 @@ export default function MoodSyncLandingPage() {
   const ambientOpacity = useSharedValue(0.3);
   const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
   const [isSpotifyConnecting, setIsSpotifyConnecting] = useState(false);
+  const toastRef = React.useRef<ToastHandle>(null);
 
   useEffect(() => {
     // Ensure the user has a unique ID for the session
@@ -102,7 +104,7 @@ export default function MoodSyncLandingPage() {
 
   const handleSpotifyConnect = async () => {
     if (spotifyToken) {
-        Alert.alert("Spotify Connected", "You are already linked to Spotify! You can now host a room.");
+        toastRef.current?.show("Linked! ✌️");
         return;
     }
 
@@ -112,11 +114,11 @@ export default function MoodSyncLandingPage() {
         if (result && result.accessToken) {
             await AsyncStorage.setItem('spotify_token_data', JSON.stringify(result));
             setSpotifyToken(result.accessToken);
-            Alert.alert("Success", "Spotify connected! Ready to sync the vibes.");
+            toastRef.current?.show("Linked! 🎵");
         }
     } catch (error) {
         console.error("Spotify login error:", error);
-        Alert.alert("Error", "Could not connect to Spotify. Try again later.");
+        toastRef.current?.show("Error 😵");
     } finally {
         setIsSpotifyConnecting(false);
     }
@@ -217,6 +219,7 @@ export default function MoodSyncLandingPage() {
           </View>
         </SafeAreaView>
       </View>
+      <NotificationToast ref={toastRef} />
     </View>
   );
 }

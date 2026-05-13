@@ -37,21 +37,27 @@ export default function HistoryDrawer({ visible, onClose, roomCode, currentUser 
     useEffect(() => {
         if (!visible || !roomCode) return;
 
-        const promptsRef = collection(db, 'sessions', roomCode, 'prompts');
-        const q = query(promptsRef, orderBy('timestamp', 'desc'));
+        const queueRef = collection(db, 'sessions', roomCode, 'queue');
+        const q = query(queueRef, orderBy('submittedAt', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data: HistoryItem[] = [];
             snapshot.forEach((doc) => {
                 const docData = doc.data();
-                data.push({
-                    id: doc.id,
-                    inputEmojis: docData.inputEmojis,
-                    userName: docData.userName || 'Anonymous',
-                    aiModel: docData.aiModel || null,
-                    selectedSong: docData.selectedSong,
-                    timestamp: docData.timestamp,
-                } as HistoryItem);
+                // Only show items that have emojis (user submissions)
+                if (docData.inputEmojis) {
+                    data.push({
+                        id: doc.id,
+                        inputEmojis: docData.inputEmojis,
+                        userName: docData.userName || 'Anonymous',
+                        aiModel: docData.aiModel || null,
+                        selectedSong: {
+                            title: docData.title,
+                            artist: docData.artist
+                        },
+                        timestamp: docData.submittedAt,
+                    } as HistoryItem);
+                }
             });
             setHistory(data);
         });

@@ -1,5 +1,6 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -85,19 +86,50 @@ const exchangeCodeForToken = async (code: string, codeVerifier: string): Promise
     }
 };
 
-export const searchSpotifyTrack = async (query: string, accessToken: string) => {
+export const refreshSpotifyToken = async (refreshToken: string): Promise<SpotifyTokenResponse | null> => {
     try {
-        const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
-            headers: { Authorization: `Bearer ${accessToken}` },
+        const response = await fetch(discovery.tokenEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                client_id: CLIENT_ID!,
+            }).toString(),
         });
+
         const data = await response.json();
-        return data.tracks.items[0] || null;
+        if (data.error) return null;
+
+        return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token || refreshToken,
+            expiresIn: data.expires_in,
+        };
     } catch (error) {
         return null;
     }
 };
 
+export const searchSpotifyTrack = async (query: string, accessToken: string): Promise<string | null> => {
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const data = await response.json();
+        const track = data.tracks.items[0];
+        return track ? track.uri : null;
+    } catch (error) {
+        console.error("[Spotify] Search error:", error);
+        return null;
+    }
+};
+
 export const queueSpotifyTrack = async (trackUri: string, accessToken: string) => {
+    if (!trackUri || typeof trackUri !== 'string') {
+        console.error("[Spotify] Invalid trackUri for queue:", trackUri);
+        return false;
+    }
     try {
         const response = await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}`, {
             method: 'POST',
@@ -112,7 +144,7 @@ export const queueSpotifyTrack = async (trackUri: string, accessToken: string) =
 export const getAvailableDevices = async (accessToken: string) => {
     try {
         const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+            headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (!response.ok) return [];
         const data = await response.json();
@@ -127,48 +159,84 @@ export const transferPlayback = async (accessToken: string, deviceId: string) =>
         await fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ device_ids: [deviceId], play: false })
+            body: JSON.stringify({ device_ids: [deviceId], play: true }),
         });
     } catch (error) {
         console.error("Spotify transfer error:", error);
     }
 };
 
-export const playSpotifyTrack = async (trackUri: string, accessToken: string) => {
-    const playAttempt = async (targetDeviceId?: string) => {
+export const playSpotifyTrack = async (trackUri: string, accessToken?: string) => {
+    if (!trackUri || typeof trackUri !== 'string') {
+        console.error("[Spotify] Invalid trackUri for play:", trackUri);
+        return false;
+    }
+
+    let currentToken = accessToken;
+
+    const playAttempt = async (token: string, targetDeviceId?: string) => {
         const url = targetDeviceId 
             ? `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`
             : 'https://api.spotify.com/v1/me/player/play';
 
+        const body = { uris: [trackUri] };
+        console.log(`[Spotify] Attempting play at ${url} with body:`, JSON.stringify(body));
+
         return fetch(url, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ uris: [trackUri] })
+            body: JSON.stringify(body)
         });
     };
 
     try {
-        let response = await playAttempt();
+        // If no token provided, get from storage
+        if (!currentToken) {
+            const tokenData = await AsyncStorage.getItem('spotify_token_data');
+            if (tokenData) currentToken = JSON.parse(tokenData).accessToken;
+        }
 
-        if (response.status === 404 || response.status === 403) {
-            console.log("[Spotify] No active device. Attempting recovery...");
-            const devices = await getAvailableDevices(accessToken);
-            if (devices.length > 0) {
-                const bestDevice = devices.find(d => d.is_active) || devices[0];
-                await transferPlayback(accessToken, bestDevice.id);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                response = await playAttempt(bestDevice.id);
+        if (!currentToken) return false;
+
+        let response = await playAttempt(currentToken);
+
+        // If 401 (Unauthorized), refresh and retry
+        if (response.status === 401) {
+            console.log("[Spotify] Token expired. Refreshing...");
+            const tokenData = await AsyncStorage.getItem('spotify_token_data');
+            if (tokenData) {
+                const parsed = JSON.parse(tokenData);
+                const refreshed = await refreshSpotifyToken(parsed.refreshToken);
+                if (refreshed) {
+                    await AsyncStorage.setItem('spotify_token_data', JSON.stringify(refreshed));
+                    currentToken = refreshed.accessToken;
+                    response = await playAttempt(currentToken);
+                }
+            }
+        }
+
+        if (!response.ok) {
+            console.log(`[Spotify] Playback failed: ${response.status}`);
+            if (response.status === 404 || response.status === 403) {
+                const devices = await getAvailableDevices(currentToken!);
+                if (devices.length > 0) {
+                    const bestDevice = devices.find(d => d.is_active) || devices[0];
+                    await transferPlayback(currentToken!, bestDevice.id);
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    response = await playAttempt(currentToken!, bestDevice.id);
+                }
             }
         }
 
         return response.ok;
-    } catch (error) {
+    } catch (error: any) {
+        console.error("[Spotify] Playback Exception:", error.message);
         return false;
     }
 };
@@ -178,7 +246,9 @@ export const getSpotifyPlaybackState = async (accessToken: string) => {
         const response = await fetch(`https://api.spotify.com/v1/me/player`, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
-        if (response.status === 204 || response.status === 404) return { isActive: false };
+        if (response.status === 204 || response.status === 404) return { isActive: false, error: response.status };
+        if (response.status === 401) return { isActive: false, error: 401 };
+        
         const data = await response.json();
         return { 
             isActive: true, 
@@ -189,13 +259,10 @@ export const getSpotifyPlaybackState = async (accessToken: string) => {
             uri: data.item?.uri
         };
     } catch (error) {
-        return { isActive: false };
+        return { isActive: false, error: 500 };
     }
 };
 
-/**
- * Skips to the next track in the Spotify queue.
- */
 export const skipToNextSpotifyTrack = async (accessToken: string) => {
     try {
         const response = await fetch('https://api.spotify.com/v1/me/player/next', {

@@ -36,6 +36,7 @@ const EMOJI_REGEX = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d
 interface EmojiSelectorProps {
     onSubmit: (emojis: string) => void;
     isLoading: boolean;
+    onSkip?: () => void;
 }
 
 const EmojiParticle = ({ emoji, index }: { emoji: string; index: number }) => {
@@ -62,7 +63,7 @@ const EmojiParticle = ({ emoji, index }: { emoji: string; index: number }) => {
     );
 };
 
-export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProps) {
+export default function EmojiSelector({ onSubmit, isLoading, onSkip }: EmojiSelectorProps) {
     const [isSheetVisible, setIsSheetVisible] = useState(false);
     const [rawInput, setRawInput] = useState('');
     const [displayEmojis, setDisplayEmojis] = useState<string[]>([]);
@@ -106,6 +107,12 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
 
     return (
         <View style={styles.container}>
+            {onSkip && (
+                <TouchableOpacity activeOpacity={0.7} onPress={onSkip} style={styles.skipButton}>
+                    <Text style={styles.skipIcon}>⏩</Text>
+                </TouchableOpacity>
+            )}
+            
             <TouchableOpacity activeOpacity={0.8} onPress={() => setIsSheetVisible(true)} disabled={isLoading} style={styles.mainButtonWrapper}>
                 <Animated.View style={styles.mainButtonShadow} />
                 <LinearGradient colors={[CYAN, PURPLE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.mainButtonGradient}>
@@ -172,7 +179,9 @@ export default function EmojiSelector({ onSubmit, isLoading }: EmojiSelectorProp
 }
 
 const styles = StyleSheet.create({
-    container: { width: '100%', alignItems: 'center', paddingVertical: 20 },
+    container: { width: '100%', alignItems: 'center', paddingVertical: 20, position: 'relative' },
+    skipButton: { position: 'absolute', top: 0, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0, 242, 255, 0.3)', shadowColor: CYAN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10 },
+    skipIcon: { fontSize: 20, textShadowColor: CYAN, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
     keyboardAvoidingView: { width: '100%' },
     mainButtonWrapper: { width: width * 0.56, height: width * 0.56, justifyContent: 'center', alignItems: 'center' },
     mainButtonShadow: { position: 'absolute', width: width * 0.56, height: width * 0.56, borderRadius: (width * 0.56) / 2, backgroundColor: CYAN, filter: 'blur(30px)', opacity: 0.2 },

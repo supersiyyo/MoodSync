@@ -1,12 +1,14 @@
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const GEMINI_MODEL_CASCADE = [
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite"
 ];
 
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY = 2000; // 2 seconds
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY = 1000; // 1 second
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

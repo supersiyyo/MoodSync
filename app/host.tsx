@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Link } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import Animated, {
     Easing,
@@ -13,8 +13,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { db } from '../services/firebase';
 import { getCurrentUser } from '../services/authService';
-import { SpotifyTokenResponse } from '../services/spotifyService';
+import { getSpotifyPlaybackState, refreshSpotifyToken, SpotifyTokenResponse } from '../services/spotifyService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NotificationToast, { ToastHandle } from '../components/NotificationToast';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,19 +29,44 @@ export default function HostScreen() {
     const [roomName, setRoomName] = useState('');
     const [isExplicit, setIsExplicit] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const toastRef = useRef<ToastHandle>(null);
     const [spotifyToken, setSpotifyToken] = useState<SpotifyTokenResponse | null>(null);
 
     const ambientScale = useSharedValue(1);
     const ambientOpacity = useSharedValue(0.3);
 
     useEffect(() => {
-        const loadSpotify = async () => {
-            const data = await AsyncStorage.getItem('spotify_token_data');
-            if (data) {
-                setSpotifyToken(JSON.parse(data));
+        const validateAndRefreshSession = async () => {
+            try {
+                const data = await AsyncStorage.getItem('spotify_token_data');
+                if (!data) return;
+                
+                let token = JSON.parse(data);
+                
+                // 1. Try to ping Spotify
+                const state = await getSpotifyPlaybackState(token.accessToken);
+                
+                // 2. If it fails (401/Invalid), try to refresh
+                if (!state.isActive && !state.isPlaying && state.error === 401) {
+                    console.log("[Host] Token expired, attempting refresh...");
+                    const refreshed = await refreshSpotifyToken(token.refreshToken);
+                    if (refreshed) {
+                        await AsyncStorage.setItem('spotify_token_data', JSON.stringify(refreshed));
+                        setSpotifyToken(refreshed);
+                    } else {
+                        // Truly dead session
+                        await AsyncStorage.removeItem('spotify_token_data');
+                        setSpotifyToken(null);
+                    }
+                } else {
+                    setSpotifyToken(token);
+                }
+            } catch (error) {
+                console.error("Session validation error:", error);
             }
         };
-        loadSpotify();
+
+        validateAndRefreshSession();
 
         ambientScale.value = withRepeat(
             withSequence(
@@ -181,10 +207,11 @@ export default function HostScreen() {
                             {spotifyToken ? (
                                 <View style={styles.connectedStatus}>
                                     <View style={styles.statusDot} />
-                                    <Text style={styles.connectedText}>Vibe Sync Active</Text>
+                                    <Text style={styles.connectedText}>Linked! 🎵</Text>
                                     <TouchableOpacity onPress={async () => {
                                         await AsyncStorage.removeItem('spotify_token_data');
                                         setSpotifyToken(null);
+                                        toastRef.current?.show("Unlinked ✌️");
                                     }}>
                                         <Text style={styles.disconnectText}>Unlink</Text>
                                     </TouchableOpacity>
@@ -211,6 +238,8 @@ export default function HostScreen() {
                     </View>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
+
+            <NotificationToast ref={toastRef} />
         </View>
     );
 }
